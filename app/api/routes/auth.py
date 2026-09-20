@@ -62,7 +62,7 @@ def request_password_reset(
     if code is not None:
         background_tasks.add_task(send_password_reset_email, data.email, code)
     # Misma respuesta exista o no el email: evita que el endpoint sirva para enumerar usuarios
-    return {"detail": "Si el email existe, se envió un código de recuperación"}
+    return {"detail": "If the email exists, a recovery code was sent"}
 
 
 @router.post("/password-recovery/confirm", status_code=status.HTTP_204_NO_CONTENT)

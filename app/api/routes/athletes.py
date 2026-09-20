@@ -48,6 +48,13 @@ def list_coached_athletes(
     return service.list_for_coach(current_user.id)
 
 
+@router.get("", response_model=list[AthleteProfileRead], dependencies=[Depends(require_roles(UserRole.ADMIN))])
+def list_athletes(
+    skip: int = 0, limit: int = 100, service: AthleteService = Depends(_get_service)
+) -> list[AthleteProfileRead]:
+    return service.list_all(skip, limit)
+
+
 @router.post("", response_model=AthleteProfileRead, status_code=status.HTTP_201_CREATED)
 def create_profile(
     data: AthleteProfileCreate, service: AthleteService = Depends(_get_service)

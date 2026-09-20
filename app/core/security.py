@@ -71,10 +71,10 @@ def decode_token(token: str, expected_type: TokenType) -> dict:
     try:
         payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
     except jwt.PyJWTError as exc:
-        raise UnauthorizedException("Token inválido o expirado") from exc
+        raise UnauthorizedException("Invalid or expired token") from exc
 
     if payload.get("type") != expected_type:
-        raise UnauthorizedException("Tipo de token incorrecto")
+        raise UnauthorizedException("Incorrect token type")
     return payload
 
 
@@ -86,7 +86,7 @@ def get_current_user(
     payload = decode_token(credentials.credentials, expected_type="access")
     user = UserRepository(db).get(int(payload["sub"]))
     if user is None or not user.is_active:
-        raise UnauthorizedException("Usuario inexistente o inactivo")
+        raise UnauthorizedException("User does not exist or is inactive")
     return user
 
 
@@ -95,7 +95,7 @@ def require_roles(*allowed_roles: UserRole):
 
     def _check_role(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in allowed_roles:
-            raise ForbiddenException("No tienes permisos para realizar esta operación")
+            raise ForbiddenException("You don't have permission to perform this operation")
         return current_user
 
     return _check_role

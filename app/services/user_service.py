@@ -1,6 +1,6 @@
 from passlib.context import CryptContext
 
-from app.core.exceptions import ConflictException, NotFoundException
+from app.core.exceptions import ConflictException, ErrorCode, NotFoundException
 from app.models.user import User, UserRole
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserCreate
@@ -16,7 +16,9 @@ class UserService:
 
     def create_user(self, data: UserCreate) -> User:
         if self._repository.get_by_email(data.email) is not None:
-            raise ConflictException(f"El email '{data.email}' ya está registrado")
+            raise ConflictException(
+                f"Email '{data.email}' is already registered", code=ErrorCode.EMAIL_ALREADY_REGISTERED
+            )
 
         user = User(
             email=data.email,

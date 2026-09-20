@@ -1,7 +1,13 @@
 from datetime import datetime, timedelta, timezone
 
 from app.core.config import settings
-from app.core.exceptions import ConflictException, ForbiddenException, NotFoundException, UnauthorizedException
+from app.core.exceptions import (
+    ConflictException,
+    ErrorCode,
+    ForbiddenException,
+    NotFoundException,
+    UnauthorizedException,
+)
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -29,7 +35,9 @@ class AuthService:
 
     def register(self, data: UserCreate) -> User:
         if self._users.get_by_email(data.email) is not None:
-            raise ConflictException(f"El email '{data.email}' ya está registrado")
+            raise ConflictException(
+                f"Email '{data.email}' is already registered", code=ErrorCode.EMAIL_ALREADY_REGISTERED
+            )
 
         user = User(
             email=data.email,
@@ -46,7 +54,7 @@ class AuthService:
             or user.verification_code_expires_at is None
             or is_expired(user.verification_code_expires_at)
         ):
-            raise UnauthorizedException("Código de verificación inválido o expirado")
+            raise UnauthorizedException("Invalid or expired verification code", code=ErrorCode.INVALID_OTP)
 
         user.is_verified = True
         user.verification_code = None
@@ -57,11 +65,11 @@ class AuthService:
     def login(self, email: str, password: str) -> TokenPair:
         user = self._users.get_by_email(email)
         if user is None or not verify_password(password, user.hashed_password):
-            raise UnauthorizedException("Email o contraseña incorrectos")
+            raise UnauthorizedException("Incorrect email or password", code=ErrorCode.INVALID_CREDENTIALS)
         if not user.is_active:
-            raise ForbiddenException("La cuenta está deshabilitada")
+            raise ForbiddenException("Account is disabled", code=ErrorCode.ACCOUNT_DISABLED)
         if not user.is_verified:
-            raise ForbiddenException("Debes verificar tu email antes de iniciar sesión")
+            raise ForbiddenException("You must verify your email before logging in", code=ErrorCode.EMAIL_NOT_VERIFIED)
 
         return self._issue_tokens(user)
 
@@ -69,7 +77,9 @@ class AuthService:
         payload = decode_token(raw_refresh_token, expected_type="refresh")
         stored = self._refresh_tokens.get_by_token_hash(hash_token(raw_refresh_token))
         if stored is None or not stored.is_active or stored.user_id != int(payload["sub"]):
-            raise UnauthorizedException("Refresh token inválido, expirado o revocado")
+            raise UnauthorizedException(
+                "Refresh token is invalid, expired or revoked", code=ErrorCode.INVALID_REFRESH_TOKEN
+            )
 
         # Rotación: el token usado se revoca de inmediato, así un refresh token reutilizado no sirve
         self._refresh_tokens.revoke(stored)
@@ -102,7 +112,7 @@ class AuthService:
             or user.password_reset_code_expires_at is None
             or is_expired(user.password_reset_code_expires_at)
         ):
-            raise UnauthorizedException("Código de recuperación inválido o expirado")
+            raise UnauthorizedException("Invalid or expired recovery code", code=ErrorCode.INVALID_OTP)
 
         user.hashed_password = hash_password(new_password)
         user.password_reset_code = None

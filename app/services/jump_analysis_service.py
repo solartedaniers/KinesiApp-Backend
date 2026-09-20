@@ -70,4 +70,4 @@ class JumpAnalysisService:
             return
         if allow_coach and current_user.role == UserRole.COACH and athlete.coach_id == current_user.id:
             return
-        raise ForbiddenException("No tienes acceso a los análisis de este deportista")
+        raise ForbiddenException("You don't have access to this athlete's analyses")

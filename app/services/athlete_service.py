@@ -1,4 +1,4 @@
-from app.core.exceptions import AppException, ConflictException, NotFoundException
+from app.core.exceptions import AppException, ConflictException, ErrorCode, NotFoundException
 from app.models.athlete import AthleteProfile
 from app.models.user import UserRole
 from app.repositories.athlete_repository import AthleteRepository
@@ -38,6 +38,10 @@ class AthleteService:
     def list_for_coach(self, coach_id: int) -> list[AthleteProfile]:
         return self._repository.list_by_coach(coach_id)
 
+    def list_all(self, skip: int = 0, limit: int = 100) -> list[AthleteProfile]:
+        # Sólo para ADMIN: alimenta la pantalla de asignación de coach, que necesita ver todos los perfiles
+        return self._repository.list(skip, limit)
+
     def assign_coach(self, athlete_id: int, coach_id: int) -> AthleteProfile:
         # Operación de admin: valida que el "coach" exista y realmente tenga rol COACH
         profile = self.get_profile(athlete_id)
@@ -45,14 +49,18 @@ class AthleteService:
         if coach is None:
             raise NotFoundException("User", coach_id)
         if coach.role != UserRole.COACH:
-            raise AppException(f"El usuario '{coach_id}' no tiene rol de entrenador")
+            raise AppException(
+                f"User '{coach_id}' does not have the coach role", code=ErrorCode.INVALID_ROLE_ASSIGNMENT
+            )
 
         profile.coach_id = coach_id
         return self._repository.add(profile)
 
     def _create_for_user(self, user_id: int, data: AthleteProfileBase) -> AthleteProfile:
         if self._repository.get_by_user_id(user_id) is not None:
-            raise ConflictException(f"El usuario '{user_id}' ya tiene un perfil de deportista")
+            raise ConflictException(
+                f"User '{user_id}' already has an athlete profile", code=ErrorCode.PROFILE_ALREADY_EXISTS
+            )
         # model_dump(exclude) porque AthleteProfileCreate agrega user_id como campo propio
         profile = AthleteProfile(user_id=user_id, **data.model_dump(exclude={"user_id"}))
         return self._repository.add(profile)

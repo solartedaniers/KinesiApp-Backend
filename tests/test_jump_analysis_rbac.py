@@ -144,3 +144,10 @@ def test_admin_has_full_access_and_manages_roles(client, register_and_verify, se
         headers=_auth_headers(athlete_token),
     )
     assert r.status_code == 403
+
+    # Sólo admin puede listar todos los perfiles de deportista (pantalla de asignación de coach)
+    r = client.get("/api/v1/athletes", headers=_auth_headers(athlete_token))
+    assert r.status_code == 403
+    r = client.get("/api/v1/athletes", headers=_auth_headers(admin_token))
+    assert r.status_code == 200
+    assert any(profile["id"] == athlete_id for profile in r.json())
