@@ -16,4 +16,5 @@ class UserRead(BaseModel):
     email: EmailStr
     full_name: str
     is_active: bool
+    is_verified: bool
     created_at: datetime

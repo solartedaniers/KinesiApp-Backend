@@ -1,42 +1,7 @@
 """Prueba de humo end-to-end: cubre el flujo completo user -> athlete -> jump analysis."""
-import pytest
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
-from app.core.database import Base, get_db
-from app.main import app
-
-# SQLite en memoria con StaticPool: una sola conexión compartida por todo el test
-engine = create_engine(
-    "sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool
-)
-TestingSessionLocal = sessionmaker(bind=engine)
 
 
-def _override_get_db():
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-app.dependency_overrides[get_db] = _override_get_db
-
-
-@pytest.fixture(autouse=True)
-def _fresh_schema():
-    Base.metadata.create_all(bind=engine)
-    yield
-    Base.metadata.drop_all(bind=engine)
-
-
-client = TestClient(app)
-
-
-def test_full_flow():
+def test_full_flow(client):
     assert client.get("/health").status_code == 200
 
     r = client.post(
