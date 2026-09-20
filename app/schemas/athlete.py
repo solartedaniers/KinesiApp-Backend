@@ -3,12 +3,19 @@ from datetime import date
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class AthleteProfileCreate(BaseModel):
-    user_id: int
+class AthleteProfileBase(BaseModel):
     sport: str = Field(min_length=1, max_length=100)
     height_cm: float = Field(gt=0, le=300)
     weight_kg: float = Field(gt=0, le=400)
     birth_date: date
+
+
+class AthleteProfileCreate(AthleteProfileBase):
+    user_id: int
+
+
+class AthleteProfileSelfCreate(AthleteProfileBase):
+    """Alta del propio perfil: el user_id sale del token (get_current_user), nunca del body."""
 
 
 class AthleteProfileRead(BaseModel):

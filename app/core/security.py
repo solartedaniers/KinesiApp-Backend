@@ -39,14 +39,6 @@ def hash_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
 
-def is_expired(expires_at: datetime) -> bool:
-    # SQLite (usada en tests) no conserva tzinfo al leer un DateTime(timezone=True);
-    # se asume UTC si viene naive para poder comparar sin TypeError en cualquier motor
-    if expires_at.tzinfo is None:
-        expires_at = expires_at.replace(tzinfo=timezone.utc)
-    return expires_at < datetime.now(timezone.utc)
-
-
 def _create_token(subject: str, token_type: TokenType, expires_delta: timedelta) -> str:
     now = datetime.now(timezone.utc)
     payload = {"sub": subject, "type": token_type, "iat": now, "exp": now + expires_delta}

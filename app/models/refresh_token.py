@@ -4,7 +4,7 @@ from sqlalchemy import DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
-from app.core.security import is_expired
+from app.core.time_utils import is_expired
 
 
 class RefreshToken(Base):

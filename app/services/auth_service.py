@@ -9,9 +9,9 @@ from app.core.security import (
     generate_otp_code,
     hash_password,
     hash_token,
-    is_expired,
     verify_password,
 )
+from app.core.time_utils import is_expired
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
 from app.repositories.refresh_token_repository import RefreshTokenRepository
