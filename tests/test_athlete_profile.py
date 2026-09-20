@@ -1,29 +1,12 @@
 """Pruebas del perfil de deportista atado al usuario autenticado (/athletes/me)."""
-from app.models.user import User
-
-
-def _register_and_get_access_token(client, db_session, email: str) -> str:
-    # Flujo real: registrar, leer el OTP directo de la DB (no hay SMTP en tests) y verificar
-    r = client.post(
-        "/api/v1/auth/register",
-        json={"email": email, "password": "supersecret1", "full_name": "Atleta"},
-    )
-    assert r.status_code == 201, r.text
-
-    user = db_session.query(User).filter(User.email == email).one()
-    r = client.post(
-        "/api/v1/auth/verify-email", json={"email": email, "code": user.verification_code}
-    )
-    assert r.status_code == 200, r.text
-    return r.json()["access_token"]
 
 
 def _auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_create_and_get_own_profile(client, db_session):
-    token = _register_and_get_access_token(client, db_session, "runner@kinesiapp.com")
+def test_create_and_get_own_profile(client, register_and_verify):
+    token = register_and_verify("runner@kinesiapp.com")
 
     r = client.get("/api/v1/athletes/me", headers=_auth_headers(token))
     assert r.status_code == 404, "todavía no existe perfil para este usuario"
@@ -39,8 +22,8 @@ def test_create_and_get_own_profile(client, db_session):
     assert r.json()["id"] == body["id"]
 
 
-def test_cannot_create_two_profiles_for_same_user(client, db_session):
-    token = _register_and_get_access_token(client, db_session, "duplicado@kinesiapp.com")
+def test_cannot_create_two_profiles_for_same_user(client, register_and_verify):
+    token = register_and_verify("duplicado@kinesiapp.com")
     payload = {"sport": "swimming", "height_cm": 165, "weight_kg": 58, "birth_date": "2001-02-10"}
 
     r = client.post("/api/v1/athletes/me", json=payload, headers=_auth_headers(token))

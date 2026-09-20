@@ -7,6 +7,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.core.database import Base, get_db
 from app.main import app
+from app.models.user import User, UserRole
 
 engine = create_engine(
     "sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool
@@ -45,3 +46,38 @@ def db_session():
         yield session
     finally:
         session.close()
+
+
+@pytest.fixture
+def register_and_verify(client, db_session):
+    """Factory fixture: registra un usuario, lee su OTP de la DB (no hay SMTP en tests),
+    lo verifica y devuelve el access token. Compartida por todos los tests que necesitan
+    un usuario autenticado sin repetir el flujo completo de /auth en cada archivo."""
+
+    def _do(email: str, password: str = "supersecret1") -> str:
+        r = client.post(
+            "/api/v1/auth/register",
+            json={"email": email, "password": password, "full_name": "Test User"},
+        )
+        assert r.status_code == 201, r.text
+
+        user = db_session.query(User).filter(User.email == email).one()
+        r = client.post(
+            "/api/v1/auth/verify-email", json={"email": email, "code": user.verification_code}
+        )
+        assert r.status_code == 200, r.text
+        return r.json()["access_token"]
+
+    return _do
+
+
+@pytest.fixture
+def set_role(db_session):
+    """Sólo para tests: en producción el ascenso a COACH/ADMIN pasa por PATCH /users/{id}/role."""
+
+    def _do(email: str, role: UserRole) -> None:
+        user = db_session.query(User).filter(User.email == email).one()
+        user.role = role
+        db_session.commit()
+
+    return _do

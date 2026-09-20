@@ -1,5 +1,6 @@
-from app.core.exceptions import ConflictException, NotFoundException
+from app.core.exceptions import AppException, ConflictException, NotFoundException
 from app.models.athlete import AthleteProfile
+from app.models.user import UserRole
 from app.repositories.athlete_repository import AthleteRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.athlete import AthleteProfileBase, AthleteProfileCreate, AthleteProfileSelfCreate
@@ -33,6 +34,21 @@ class AthleteService:
         if profile is None:
             raise NotFoundException("AthleteProfile", user_id)
         return profile
+
+    def list_for_coach(self, coach_id: int) -> list[AthleteProfile]:
+        return self._repository.list_by_coach(coach_id)
+
+    def assign_coach(self, athlete_id: int, coach_id: int) -> AthleteProfile:
+        # Operación de admin: valida que el "coach" exista y realmente tenga rol COACH
+        profile = self.get_profile(athlete_id)
+        coach = self._user_repository.get(coach_id)
+        if coach is None:
+            raise NotFoundException("User", coach_id)
+        if coach.role != UserRole.COACH:
+            raise AppException(f"El usuario '{coach_id}' no tiene rol de entrenador")
+
+        profile.coach_id = coach_id
+        return self._repository.add(profile)
 
     def _create_for_user(self, user_id: int, data: AthleteProfileBase) -> AthleteProfile:
         if self._repository.get_by_user_id(user_id) is not None:

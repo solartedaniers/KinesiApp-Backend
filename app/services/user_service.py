@@ -1,7 +1,7 @@
 from passlib.context import CryptContext
 
 from app.core.exceptions import ConflictException, NotFoundException
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserCreate
 
@@ -33,3 +33,9 @@ class UserService:
 
     def list_users(self, skip: int = 0, limit: int = 100) -> list[User]:
         return self._repository.list(skip, limit)
+
+    def set_role(self, user_id: int, role: UserRole) -> User:
+        # Único mecanismo para volverse COACH/ADMIN: un admin ya autenticado lo asigna
+        user = self.get_user(user_id)
+        user.role = role
+        return self._repository.add(user)

@@ -13,12 +13,15 @@ class AthleteProfile(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, nullable=False)
+    # Entrenador asignado (rol COACH); nulo hasta que un admin lo asigne
+    coach_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     sport: Mapped[str] = mapped_column(String(100), nullable=False)
     height_cm: Mapped[float] = mapped_column(Float, nullable=False)
     weight_kg: Mapped[float] = mapped_column(Float, nullable=False)
     birth_date: Mapped[date] = mapped_column(Date, nullable=False)
 
-    user: Mapped["User"] = relationship(back_populates="athlete_profile")
+    user: Mapped["User"] = relationship(back_populates="athlete_profile", foreign_keys=[user_id])
+    coach: Mapped["User | None"] = relationship(back_populates="coached_athletes", foreign_keys=[coach_id])
     jump_analyses: Mapped[list["JumpAnalysis"]] = relationship(
         back_populates="athlete", cascade="all, delete-orphan"
     )

@@ -18,11 +18,18 @@ class AthleteProfileSelfCreate(AthleteProfileBase):
     """Alta del propio perfil: el user_id sale del token (get_current_user), nunca del body."""
 
 
+class CoachAssignment(BaseModel):
+    """Asignación de entrenador a un deportista; sólo un admin puede invocarla."""
+
+    coach_id: int
+
+
 class AthleteProfileRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     user_id: int
+    coach_id: int | None
     sport: str
     height_cm: float
     weight_kg: float
