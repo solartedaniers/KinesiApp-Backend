@@ -1,20 +1,20 @@
 """Prueba de humo end-to-end del módulo de auth: registro -> OTP -> login -> refresh -> recuperación."""
 from app.models.user import User
+import re
 
 
-def _read_verification_code(db_session, email: str) -> str:
-    # El código solo "llega" por email (que en test no hay SMTP real); se lee directo de la DB
-    user = db_session.query(User).filter(User.email == email).one()
-    return user.verification_code
+def _read_code(email_outbox, email: str, subject: str) -> str:
+    message = next(
+        item
+        for item in reversed(email_outbox)
+        if item["to"] == email and subject in item["subject"]
+    )
+    return re.search(r"\b\d{6}\b", message["body"]).group()
 
 
-def _read_reset_code(db_session, email: str) -> str:
-    db_session.expire_all()
-    user = db_session.query(User).filter(User.email == email).one()
-    return user.password_reset_code
-
-
-def test_register_verify_login_refresh_and_password_recovery(client, db_session):
+def test_register_verify_login_refresh_and_password_recovery(
+    client, db_session, email_outbox
+):
     email = "atleta@kinesiapp.com"
 
     r = client.post(
@@ -32,7 +32,11 @@ def test_register_verify_login_refresh_and_password_recovery(client, db_session)
     r = client.post("/api/v1/auth/verify-email", json={"email": email, "code": "000000"})
     assert r.status_code == 401
 
-    code = _read_verification_code(db_session, email)
+    db_session.expire_all()
+    user = db_session.query(User).filter(User.email == email).one()
+    assert user.verification_code_hash
+    assert len(user.verification_code_hash) > 6
+    code = _read_code(email_outbox, email, "Verifica")
     r = client.post("/api/v1/auth/verify-email", json={"email": email, "code": code})
     assert r.status_code == 200, r.text
     tokens = r.json()
@@ -70,7 +74,11 @@ def test_register_verify_login_refresh_and_password_recovery(client, db_session)
     r = client.post("/api/v1/auth/password-recovery/request", json={"email": "nadie@x.com"})
     assert r.status_code == 202
 
-    reset_code = _read_reset_code(db_session, email)
+    db_session.expire_all()
+    user = db_session.query(User).filter(User.email == email).one()
+    assert user.password_reset_code_hash
+    assert len(user.password_reset_code_hash) > 6
+    reset_code = _read_code(email_outbox, email, "Recuperación")
     r = client.post(
         "/api/v1/auth/password-recovery/confirm",
         json={"email": email, "code": reset_code, "new_password": "unanuevaclave1"},

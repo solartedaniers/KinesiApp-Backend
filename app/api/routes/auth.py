@@ -29,9 +29,21 @@ def _get_service(db: Session = Depends(get_db)) -> AuthService:
 def register(
     data: UserCreate, background_tasks: BackgroundTasks, service: AuthService = Depends(_get_service)
 ) -> UserRead:
-    user = service.register(data)
-    background_tasks.add_task(send_verification_email, user.email, user.verification_code)
+    user, code = service.register(data)
+    background_tasks.add_task(send_verification_email, user.email, code)
     return user
+
+
+@router.post("/verification-code/request", status_code=status.HTTP_202_ACCEPTED)
+def request_verification_code(
+    data: PasswordResetRequest,
+    background_tasks: BackgroundTasks,
+    service: AuthService = Depends(_get_service),
+) -> dict[str, str]:
+    code = service.request_verification_code(data.email)
+    if code is not None:
+        background_tasks.add_task(send_verification_email, data.email, code)
+    return {"detail": "If the account can be verified, a new code was sent"}
 
 
 @router.post("/verify-email", response_model=TokenPair)

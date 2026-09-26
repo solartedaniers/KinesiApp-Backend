@@ -32,13 +32,15 @@ class User(Base):
 
     # Verificación de cuenta por OTP enviado a email
     is_verified: Mapped[bool] = mapped_column(default=False)
-    verification_code: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    verification_code_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    verification_code_attempts: Mapped[int] = mapped_column(default=0, nullable=False)
     verification_code_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
 
     # Recuperación de contraseña por OTP enviado a email
-    password_reset_code: Mapped[str | None] = mapped_column(String(6), nullable=True)
+    password_reset_code_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    password_reset_code_attempts: Mapped[int] = mapped_column(default=0, nullable=False)
     password_reset_code_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

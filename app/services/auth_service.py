@@ -13,8 +13,10 @@ from app.core.security import (
     create_refresh_token,
     decode_token,
     generate_otp_code,
+    hash_otp_code,
     hash_password,
     hash_token,
+    verify_otp_code,
     verify_password,
 )
 from app.core.time_utils import is_expired
@@ -33,7 +35,7 @@ class AuthService:
         self._users = user_repository
         self._refresh_tokens = refresh_token_repository
 
-    def register(self, data: UserCreate) -> User:
+    def register(self, data: UserCreate) -> tuple[User, str]:
         if self._users.get_by_email(data.email) is not None:
             raise ConflictException(
                 f"Email '{data.email}' is already registered", code=ErrorCode.EMAIL_ALREADY_REGISTERED
@@ -44,21 +46,32 @@ class AuthService:
             hashed_password=hash_password(data.password),
             full_name=data.full_name,
         )
-        self._assign_verification_code(user)
-        return self._users.add(user)
+        code = self._assign_verification_code(user)
+        return self._users.add(user), code
+
+    def request_verification_code(self, email: str) -> str | None:
+        user = self._users.get_by_email(email)
+        if user is None or user.is_verified:
+            return None
+        code = self._assign_verification_code(user)
+        self._users.add(user)
+        return code
 
     def verify_email(self, email: str, code: str) -> TokenPair:
         user = self._get_user_by_email(email)
-        if (
-            user.verification_code != code
-            or user.verification_code_expires_at is None
-            or is_expired(user.verification_code_expires_at)
-        ):
-            raise UnauthorizedException("Invalid or expired verification code", code=ErrorCode.INVALID_OTP)
+        self._validate_otp(
+            user,
+            code,
+            user.verification_code_hash,
+            user.verification_code_expires_at,
+            user.verification_code_attempts,
+            "verification_code_attempts",
+        )
 
         user.is_verified = True
-        user.verification_code = None
+        user.verification_code_hash = None
         user.verification_code_expires_at = None
+        user.verification_code_attempts = 0
         self._users.add(user)
         return self._issue_tokens(user)
 
@@ -98,7 +111,8 @@ class AuthService:
             return None  # el endpoint responde igual para no filtrar qué emails existen
 
         code = generate_otp_code()
-        user.password_reset_code = code
+        user.password_reset_code_hash = hash_otp_code(code)
+        user.password_reset_code_attempts = 0
         user.password_reset_code_expires_at = datetime.now(timezone.utc) + timedelta(
             minutes=settings.OTP_EXPIRE_MINUTES
         )
@@ -107,16 +121,19 @@ class AuthService:
 
     def confirm_password_reset(self, email: str, code: str, new_password: str) -> None:
         user = self._get_user_by_email(email)
-        if (
-            user.password_reset_code != code
-            or user.password_reset_code_expires_at is None
-            or is_expired(user.password_reset_code_expires_at)
-        ):
-            raise UnauthorizedException("Invalid or expired recovery code", code=ErrorCode.INVALID_OTP)
+        self._validate_otp(
+            user,
+            code,
+            user.password_reset_code_hash,
+            user.password_reset_code_expires_at,
+            user.password_reset_code_attempts,
+            "password_reset_code_attempts",
+        )
 
         user.hashed_password = hash_password(new_password)
-        user.password_reset_code = None
+        user.password_reset_code_hash = None
         user.password_reset_code_expires_at = None
+        user.password_reset_code_attempts = 0
         self._users.add(user)
         # Cambiar la contraseña invalida cualquier sesión previa (dispositivos robados/perdidos)
         self._refresh_tokens.revoke_all_for_user(user.id)
@@ -129,11 +146,36 @@ class AuthService:
         )
         return TokenPair(access_token=access_token, refresh_token=raw_refresh_token)
 
-    def _assign_verification_code(self, user: User) -> None:
-        user.verification_code = generate_otp_code()
+    def _assign_verification_code(self, user: User) -> str:
+        code = generate_otp_code()
+        user.verification_code_hash = hash_otp_code(code)
+        user.verification_code_attempts = 0
         user.verification_code_expires_at = datetime.now(timezone.utc) + timedelta(
             minutes=settings.OTP_EXPIRE_MINUTES
         )
+        return code
+
+    def _validate_otp(
+        self,
+        user: User,
+        code: str,
+        code_hash: str | None,
+        expires_at: datetime | None,
+        attempts: int,
+        attempts_field: str,
+    ) -> None:
+        invalid = (
+            code_hash is None
+            or expires_at is None
+            or is_expired(expires_at)
+            or attempts >= settings.OTP_MAX_ATTEMPTS
+        )
+        if invalid:
+            raise UnauthorizedException("Invalid or expired verification code", code=ErrorCode.INVALID_OTP)
+        if not verify_otp_code(code, code_hash):
+            setattr(user, attempts_field, attempts + 1)
+            self._users.add(user)
+            raise UnauthorizedException("Invalid or expired verification code", code=ErrorCode.INVALID_OTP)
 
     def _get_user_by_email(self, email: str) -> User:
         user = self._users.get_by_email(email)

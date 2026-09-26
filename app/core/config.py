@@ -1,7 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import URL
 
@@ -32,14 +32,15 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
-    OTP_EXPIRE_MINUTES: int = 10
+    OTP_EXPIRE_MINUTES: int = Field(gt=0)
+    OTP_MAX_ATTEMPTS: int = Field(default=5, gt=0)
 
-    # SMTP para correos transaccionales (verificación de cuenta, recuperación de contraseña)
-    SMTP_HOST: str = "localhost"
-    SMTP_PORT: int = 587
-    SMTP_USER: str = ""
-    SMTP_PASSWORD: str = ""
-    SMTP_FROM_EMAIL: str = "no-reply@kinesiapp.com"
+    # Gmail usa smtp.gmail.com:587 con STARTTLS y contraseña de aplicación.
+    SMTP_HOST: str = Field(min_length=1)
+    SMTP_PORT: int = Field(gt=0, le=65535)
+    SMTP_USER: str = Field(min_length=1)
+    SMTP_PASSWORD: SecretStr = Field(min_length=1)
+    SMTP_FROM: str = Field(min_length=3)
     SMTP_USE_TLS: bool = True
 
     @property

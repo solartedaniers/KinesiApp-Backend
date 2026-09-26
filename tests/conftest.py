@@ -1,4 +1,17 @@
 """Fixtures compartidas: una sola DB SQLite en memoria, reseteada por test."""
+import os
+
+# Config SMTP de prueba: no se conecta a internet; EmailSender queda reemplazado
+# por el fixture email_outbox antes de enviar correos.
+os.environ.setdefault("SMTP_HOST", "smtp.test")
+os.environ.setdefault("SMTP_PORT", "587")
+os.environ.setdefault("SMTP_USER", "test@kinesiapp.test")
+os.environ.setdefault("SMTP_PASSWORD", "test-password")
+os.environ.setdefault("SMTP_FROM", "test@kinesiapp.test")
+os.environ.setdefault("OTP_EXPIRE_MINUTES", "10")
+
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -39,6 +52,17 @@ def client():
 
 
 @pytest.fixture
+def email_outbox(monkeypatch):
+    messages = []
+
+    def capture_email(sender, recipient, subject, body):
+        messages.append({"to": recipient, "subject": subject, "body": body})
+
+    monkeypatch.setattr("app.core.email.EmailSender.send", capture_email)
+    return messages
+
+
+@pytest.fixture
 def db_session():
     # Para que un test pueda leer/mutar filas directamente (p. ej. un código OTP que solo llega por email)
     session = TestingSessionLocal()
@@ -49,7 +73,7 @@ def db_session():
 
 
 @pytest.fixture
-def register_and_verify(client, db_session):
+def register_and_verify(client, db_session, email_outbox):
     """Factory fixture: registra un usuario, lee su OTP de la DB (no hay SMTP en tests),
     lo verifica y devuelve el access token. Compartida por todos los tests que necesitan
     un usuario autenticado sin repetir el flujo completo de /auth en cada archivo."""
@@ -61,9 +85,10 @@ def register_and_verify(client, db_session):
         )
         assert r.status_code == 201, r.text
 
-        user = db_session.query(User).filter(User.email == email).one()
+        message = next(item for item in reversed(email_outbox) if item["to"] == email)
+        code = re.search(r"\b\d{6}\b", message["body"]).group()
         r = client.post(
-            "/api/v1/auth/verify-email", json={"email": email, "code": user.verification_code}
+            "/api/v1/auth/verify-email", json={"email": email, "code": code}
         )
         assert r.status_code == 200, r.text
         return r.json()["access_token"]

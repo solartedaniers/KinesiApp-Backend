@@ -29,6 +29,18 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return _pwd_context.verify(plain_password, hashed_password)
 
 
+def hash_otp_code(code: str) -> str:
+    """Guarda OTPs con bcrypt: un volcado de DB no revela códigos vigentes."""
+    return _pwd_context.hash(code)
+
+
+def verify_otp_code(code: str, code_hash: str) -> bool:
+    try:
+        return _pwd_context.verify(code, code_hash)
+    except (ValueError, TypeError):
+        return False
+
+
 def generate_otp_code() -> str:
     # 6 dígitos numéricos: suficiente entropía para un código de un solo uso de vida corta
     return f"{secrets.randbelow(1_000_000):06d}"

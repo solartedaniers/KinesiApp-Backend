@@ -1,5 +1,6 @@
 import logging
 import smtplib
+import ssl
 from email.message import EmailMessage
 
 from app.core.config import settings
@@ -32,9 +33,8 @@ class EmailSender:
         try:
             with smtplib.SMTP(self._host, self._port, timeout=10) as server:
                 if self._use_tls:
-                    server.starttls()
-                if self._user:
-                    server.login(self._user, self._password)
+                    server.starttls(context=ssl.create_default_context())
+                server.login(self._user, self._password)
                 server.send_message(message)
         except (OSError, smtplib.SMTPException):
             logger.warning("No se pudo enviar el correo a %s", to, exc_info=True)
@@ -45,8 +45,8 @@ def _build_sender() -> EmailSender:
         settings.SMTP_HOST,
         settings.SMTP_PORT,
         settings.SMTP_USER,
-        settings.SMTP_PASSWORD,
-        settings.SMTP_FROM_EMAIL,
+        settings.SMTP_PASSWORD.get_secret_value(),
+        settings.SMTP_FROM,
         settings.SMTP_USE_TLS,
     )
 
