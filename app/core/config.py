@@ -1,20 +1,30 @@
 from functools import lru_cache
+from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from sqlalchemy.engine import URL
 
 
 class Settings(BaseSettings):
     """Configuración de la aplicación, cargada desde variables de entorno (.env)."""
 
-    model_config = SettingsConfigDict(env_file="../.env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parents[3] / ".env",
+        env_file_encoding="utf-8",
+    )
 
     PROJECT_NAME: str = "KinesiApp API"
     API_V1_PREFIX: str = "/api/v1"
+    CORS_ALLOWED_ORIGINS: list[str] = Field(default_factory=list)
+    CORS_ALLOW_ORIGIN_REGEX: str | None = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 
     POSTGRES_USER: str = "kinesiapp"
     POSTGRES_PASSWORD: str = "kinesiapp"
     POSTGRES_HOST: str = "localhost"
-    POSTGRES_PORT: int = 5432
+    # En desarrollo local de Windows, docker-compose publica PostgreSQL aquí.
+    # El servicio API de Docker sobrescribe el puerto a 5432.
+    POSTGRES_PORT: int = 5434
     POSTGRES_DB: str = "kinesiapp"
 
     # JWT: access de vida corta para uso normal, refresh de vida larga solo para renovarlo
@@ -33,11 +43,15 @@ class Settings(BaseSettings):
     SMTP_USE_TLS: bool = True
 
     @property
-    def database_url(self) -> str:
-        # Se compone en runtime para no quemar credenciales en el código
-        return (
-            f"postgresql+psycopg2://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
-            f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+    def database_url(self) -> URL:
+        # URL.create escapa correctamente credenciales con @, :, / o %.
+        return URL.create(
+            drivername="postgresql+psycopg2",
+            username=self.POSTGRES_USER,
+            password=self.POSTGRES_PASSWORD,
+            host=self.POSTGRES_HOST,
+            port=self.POSTGRES_PORT,
+            database=self.POSTGRES_DB,
         )
 
 

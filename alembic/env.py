@@ -17,7 +17,10 @@ config = context.config
 
 # La URL de conexión sale de Settings (variables de entorno / .env), nunca de
 # alembic.ini, para no duplicar ni desincronizar credenciales.
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option(
+    "sqlalchemy.url",
+    settings.database_url.render_as_string(hide_password=False).replace("%", "%%"),
+)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
