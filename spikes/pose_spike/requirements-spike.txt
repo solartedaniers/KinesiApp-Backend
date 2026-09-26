@@ -1,0 +1,10 @@
+# Dependencias propias del spike (Fase 0.5). No tocar backend/requirements.txt.
+# Instalar en un venv separado:
+#   python -m venv .venv-spike && source .venv-spike/bin/activate  (o .venv-spike\Scripts\activate en Windows)
+#   pip install -r requirements-spike.txt
+mediapipe>=1.0,<2
+opencv-python-headless>=4.9,<5
+numpy>=1.26,<3
+scipy>=1.11,<2
+psutil>=5.9,<7
+matplotlib>=3.8,<4

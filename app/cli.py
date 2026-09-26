@@ -7,8 +7,10 @@ import argparse
 import getpass
 import os
 
-from app.core.database import Base, SessionLocal, engine
-from app.models.user import UserRole
+from sqlalchemy import inspect
+
+from app.core.database import SessionLocal, engine
+from app.models.user import User, UserRole
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserCreate
 from app.services.user_service import UserService
@@ -21,10 +23,20 @@ def _read_credentials() -> tuple[str, str, str]:
     return email, password, full_name
 
 
+def _ensure_schema_migrated() -> None:
+    # La CLI no crea tablas: si el esquema no está migrado, falla con un
+    # mensaje claro en vez de crearlo por su cuenta (eso es trabajo de Alembic).
+    if not inspect(engine).has_table(User.__tablename__):
+        raise SystemExit(
+            "El esquema de la base de datos no está migrado "
+            f"(falta la tabla '{User.__tablename__}'). Corré 'alembic upgrade head' primero."
+        )
+
+
 def create_admin() -> None:
     email, password, full_name = _read_credentials()
 
-    Base.metadata.create_all(bind=engine)
+    _ensure_schema_migrated()
     db = SessionLocal()
     try:
         repository = UserRepository(db)
