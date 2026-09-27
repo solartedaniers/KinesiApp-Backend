@@ -123,7 +123,7 @@ def test_avatar_rejects_mismatched_content(client, register_and_verify):
     assert r.status_code == 422
 
 
-def test_coach_sets_managed_athlete_avatar_and_team_analyses(client, register_and_verify):
+def test_coach_sets_managed_athlete_avatar_and_team_analyses(client, register_and_verify, grant_consent, upload_jump):
     coach = register_and_verify("avatar-coach@kinesiapp.com", role="coach")
     other = register_and_verify("other-coach@kinesiapp.com", role="coach")
     athlete = client.post(
@@ -137,9 +137,8 @@ def test_coach_sets_managed_athlete_avatar_and_team_analyses(client, register_an
         f"/api/v1/coach/athletes/{athlete['id']}/avatar", json=PNG_AVATAR, headers=_auth(other)
     ).status_code == 404
 
-    client.post(
-        "/api/v1/jump-analyses", json={"athlete_id": athlete["id"], "video_reference": "v1.mp4"}, headers=_auth(coach)
-    )
+    grant_consent(coach)
+    assert upload_jump(coach, athlete["id"]).status_code == 202
     team = client.get("/api/v1/jump-analyses/team", headers=_auth(coach)).json()
     assert [item["athlete_id"] for item in team] == [athlete["id"]]
     assert client.get("/api/v1/jump-analyses/team", headers=_auth(other)).json() == []

@@ -5,18 +5,20 @@ from typing import Literal
 
 import jwt
 from fastapi import Depends
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.core.exceptions import ForbiddenException, UnauthorizedException
+from app.core.exceptions import ErrorCode, ForbiddenException, UnauthorizedException
 from app.models.user import User, UserRole
 from app.repositories.user_repository import UserRepository
 
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 _bearer_scheme = HTTPBearer(auto_error=True)
+# Header propio para procesos internos: no se mezcla con el JWT de los usuarios
+_service_api_key_scheme = APIKeyHeader(name="X-Service-Api-Key", auto_error=False)
 
 TokenType = Literal["access", "refresh"]
 
@@ -111,3 +113,13 @@ def require_roles(*allowed_roles: UserRole):
         return current_user
 
     return _check_role
+
+
+def require_service_api_key(api_key: str | None = Depends(_service_api_key_scheme)) -> None:
+    """Autentica a un proceso interno (no a una persona) por API key de servicio."""
+    configured = settings.JUMP_ANALYSIS_SERVICE_API_KEY
+    expected = configured.get_secret_value() if configured else ""
+    # Clave vacía = no configurada: nunca se acepta un header vacío contra una clave vacía.
+    # compare_digest: tiempo constante, no filtra cuántos caracteres coinciden
+    if not expected or not api_key or not secrets.compare_digest(api_key.encode(), expected.encode()):
+        raise UnauthorizedException("Invalid service API key", code=ErrorCode.INVALID_SERVICE_API_KEY)

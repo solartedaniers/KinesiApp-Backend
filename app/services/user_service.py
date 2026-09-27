@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from app.core.exceptions import ConflictException, ErrorCode, NotFoundException
 from app.core.security import hash_password
 from app.models.user import User, UserRole
@@ -46,4 +48,9 @@ class UserService:
 
     def set_avatar(self, user: User, avatar_data_url: str | None) -> User:
         user.avatar_data_url = avatar_data_url
+        return self._repository.add(user)
+
+    def grant_video_consent(self, user: User, version: int) -> User:
+        user.video_consent_given_at = datetime.now(timezone.utc)
+        user.video_consent_version = version
         return self._repository.add(user)

@@ -1,11 +1,12 @@
 """Prueba de humo end-to-end: cubre el flujo completo user -> athlete -> jump analysis."""
+from tests.conftest import SERVICE_API_KEY
 
 
 def _auth_headers(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_full_flow(client, register_and_verify):
+def test_full_flow(client, register_and_verify, grant_consent, upload_jump):
     assert client.get("/health").status_code == 200
 
     # Alta legacy (POST /users, sin verificación) sigue abierta; se cubre aparte su regla de unicidad
@@ -30,22 +31,20 @@ def test_full_flow(client, register_and_verify):
     assert r.status_code == 201, r.text
     athlete_id = r.json()["id"]
 
-    r = client.post(
-        "/api/v1/jump-analyses",
-        json={"athlete_id": athlete_id, "video_reference": "s3://video.mp4"},
-        headers=headers,
-    )
-    assert r.status_code == 201, r.text
+    grant_consent(token)
+    r = upload_jump(token, athlete_id)
+    assert r.status_code == 202, r.text
     analysis_id = r.json()["id"]
     assert r.json()["status"] == "pending"
 
-    # Simula al pipeline de IA reportando el resultado del salto (webhook, sin token de usuario)
+    # Simula al pipeline de IA reportando el resultado (API key de servicio, no JWT)
     r = client.post(
         f"/api/v1/jump-analyses/{analysis_id}/results",
         json={
             "risk_score": 0.42,
             "measurements": [{"joint_name": "knee", "angle_degrees": 145.5, "frame_timestamp_ms": 120}],
         },
+        headers={"X-Service-Api-Key": SERVICE_API_KEY},
     )
     assert r.status_code == 200, r.text
     assert r.json()["status"] == "processed"

@@ -55,6 +55,12 @@ class Settings(BaseSettings):
     # clínico validado (ver docs/design/video-analysis-pipeline.md §5)
     RISK_SAFE_KNEE_FLEXION_DEG: float = Field(default=60.0, gt=0)
 
+    # Clave del proceso interno que reporta resultados a POST /jump-analyses/{id}/results.
+    # Sin definir, ese endpoint rechaza toda llamada (cerrado por defecto)
+    JUMP_ANALYSIS_SERVICE_API_KEY: SecretStr | None = None
+    # Versión vigente del texto de consentimiento de video: subir exige haber aceptado ésta
+    VIDEO_CONSENT_VERSION: int = Field(default=1, gt=0)
+
     @property
     def database_url(self) -> URL:
         # URL.create escapa correctamente credenciales con @, :, / o %.

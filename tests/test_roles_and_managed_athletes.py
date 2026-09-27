@@ -109,18 +109,16 @@ def test_managed_athlete_is_linked_to_its_coach(client, register_and_verify):
     assert [a["id"] for a in client.get("/api/v1/athletes/coached", headers=_auth(coach)).json()] == [created["id"]]
 
 
-def test_coach_records_and_lists_analyses_of_managed_athlete(client, register_and_verify):
+def test_coach_records_and_lists_analyses_of_managed_athlete(client, register_and_verify, grant_consent, upload_jump):
     coach = register_and_verify("analyst-coach@kinesiapp.com", role="coach")
     athlete_id = client.post(
         "/api/v1/coach/athletes", json={**PROFILE, "full_name": "Mateo"}, headers=_auth(coach)
     ).json()["id"]
 
-    r = client.post(
-        "/api/v1/jump-analyses",
-        json={"athlete_id": athlete_id, "video_reference": "s3://jump.mp4"},
-        headers=_auth(coach),
-    )
-    assert r.status_code == 201, r.text
+    # El coach sube por su deportista gestionado: el consentimiento exigido es el suyo
+    grant_consent(coach)
+    r = upload_jump(coach, athlete_id)
+    assert r.status_code == 202, r.text
     r = client.get(f"/api/v1/jump-analyses/by-athlete/{athlete_id}", headers=_auth(coach))
     assert len(r.json()) == 1
 

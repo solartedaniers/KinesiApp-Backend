@@ -1,12 +1,12 @@
 from typing import BinaryIO
 
-from app.core.exceptions import ForbiddenException, NotFoundException
+from app.core.exceptions import ErrorCode, ForbiddenException, NotFoundException
 from app.models.athlete import AthleteProfile
 from app.models.jump_analysis import JointAngleMeasurement, JumpAnalysis, JumpAnalysisStatus
 from app.models.user import User, UserRole
 from app.repositories.athlete_repository import AthleteRepository
 from app.repositories.jump_analysis_repository import JumpAnalysisRepository
-from app.schemas.jump_analysis import JumpAnalysisCreate, JumpAnalysisResultIngest
+from app.schemas.jump_analysis import JumpAnalysisResultIngest
 from app.services.jump_video_storage import JumpVideoStorage
 
 
@@ -22,21 +22,19 @@ class JumpAnalysisService:
         repository: JumpAnalysisRepository,
         athlete_repository: AthleteRepository,
         video_storage: JumpVideoStorage,
+        required_consent_version: int,
     ) -> None:
         self._repository = repository
         self._athlete_repository = athlete_repository
         self._video_storage = video_storage
-
-    def create_analysis(self, current_user: User, data: JumpAnalysisCreate) -> JumpAnalysis:
-        self._authorize_upload(current_user, data.athlete_id)
-        analysis = JumpAnalysis(athlete_id=data.athlete_id, video_reference=data.video_reference)
-        return self._repository.add(analysis)
+        self._required_consent_version = required_consent_version
 
     def create_from_upload(
         self, current_user: User, athlete_id: int, video: BinaryIO, content_type: str | None
     ) -> JumpAnalysis:
         # Se autoriza antes de escribir en disco: un intruso no llega a ocupar espacio
         self._authorize_upload(current_user, athlete_id)
+        self._require_video_consent(current_user)
         video_path = self._video_storage.save(video, content_type)
         try:
             return self._repository.add(
@@ -86,6 +84,12 @@ class JumpAnalysisService:
         athlete = self._get_athlete_or_404(athlete_id)
         # El propio deportista sube sus saltos; los gestionados (sin cuenta) los sube su coach
         self._authorize_athlete_access(current_user, athlete, allow_coach=athlete.is_managed)
+
+    def _require_video_consent(self, uploader: User) -> None:
+        # Quien graba/sube debe haber aceptado la versión vigente del texto: el propio
+        # deportista, o el coach en el caso de un deportista gestionado (sin cuenta)
+        if uploader.video_consent_version != self._required_consent_version:
+            raise ForbiddenException("Video consent is required", code=ErrorCode.CONSENT_REQUIRED)
 
     def _get_athlete_or_404(self, athlete_id: int) -> AthleteProfile:
         athlete = self._athlete_repository.get(athlete_id)

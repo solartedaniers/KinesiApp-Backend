@@ -5,11 +5,6 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.models.jump_analysis import JumpAnalysisStatus
 
 
-class JumpAnalysisCreate(BaseModel):
-    athlete_id: int
-    video_reference: str = Field(min_length=1, max_length=500)
-
-
 class JointAngleMeasurementCreate(BaseModel):
     """Payload que envía el pipeline de IA por cada frame analizado."""
 
@@ -39,7 +34,7 @@ class JumpAnalysisRead(BaseModel):
 
     id: int
     athlete_id: int
-    video_reference: str
+    # Sin video_reference: es una ruta de disco del servidor y el cliente no la necesita
     status: JumpAnalysisStatus
     risk_score: float | None
     recorded_at: datetime

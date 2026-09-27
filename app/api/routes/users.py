@@ -6,7 +6,7 @@ from app.core.security import get_current_user, require_roles
 from app.models.user import User, UserRole
 from app.repositories.user_repository import UserRepository
 from app.schemas.avatar import AvatarUpload
-from app.schemas.user import UserCreate, UserProfileUpdate, UserRead, UserRoleUpdate
+from app.schemas.user import UserCreate, UserProfileUpdate, UserRead, UserRoleUpdate, VideoConsentGrant
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -47,6 +47,15 @@ def delete_my_avatar(
     current_user: User = Depends(get_current_user), service: UserService = Depends(_get_service)
 ) -> UserRead:
     return service.set_avatar(current_user, None)
+
+
+@router.post("/me/video-consent", response_model=UserRead)
+def grant_my_video_consent(
+    data: VideoConsentGrant,
+    current_user: User = Depends(get_current_user),
+    service: UserService = Depends(_get_service),
+) -> UserRead:
+    return service.grant_video_consent(current_user, data.version)
 
 
 # GET queda restringido a ADMIN: listar/consultar cuentas es gestión global del sistema

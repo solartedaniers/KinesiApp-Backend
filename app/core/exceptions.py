@@ -25,6 +25,8 @@ class ErrorCode(str, enum.Enum):
     INVALID_CURRENT_PASSWORD = "invalid_current_password"
     INVALID_VIDEO = "invalid_video"
     VIDEO_TOO_LARGE = "video_too_large"
+    INVALID_SERVICE_API_KEY = "invalid_service_api_key"
+    CONSENT_REQUIRED = "consent_required"
 
 
 class AppException(Exception):

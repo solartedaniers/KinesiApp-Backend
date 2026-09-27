@@ -20,55 +20,43 @@ def _create_athlete_profile(client, token: str, gender: str = "male") -> int:
     return r.json()["id"]
 
 
-def test_athlete_creates_and_owns_analysis(client, register_and_verify):
+def test_athlete_creates_and_owns_analysis(client, register_and_verify, grant_consent, upload_jump):
     token = register_and_verify("owner@kinesiapp.com")
     athlete_id = _create_athlete_profile(client, token)
+    grant_consent(token)
 
-    r = client.post(
-        "/api/v1/jump-analyses",
-        json={"athlete_id": athlete_id, "video_reference": "s3://video.mp4"},
-        headers=_auth_headers(token),
-    )
-    assert r.status_code == 201, r.text
+    r = upload_jump(token, athlete_id)
+    assert r.status_code == 202, r.text
 
     analysis_id = r.json()["id"]
     r = client.get(f"/api/v1/jump-analyses/{analysis_id}", headers=_auth_headers(token))
     assert r.status_code == 200, r.text
 
 
-def test_other_athlete_cannot_access_analysis(client, register_and_verify):
+def test_other_athlete_cannot_access_analysis(client, register_and_verify, grant_consent, upload_jump):
     owner_token = register_and_verify("owner2@kinesiapp.com")
     owner_athlete_id = _create_athlete_profile(client, owner_token)
-    r = client.post(
-        "/api/v1/jump-analyses",
-        json={"athlete_id": owner_athlete_id, "video_reference": "s3://video.mp4"},
-        headers=_auth_headers(owner_token),
-    )
+    grant_consent(owner_token)
+    r = upload_jump(owner_token, owner_athlete_id)
     analysis_id = r.json()["id"]
 
     intruder_token = register_and_verify("intruso@kinesiapp.com")
     _create_athlete_profile(client, intruder_token, gender="female")
+    grant_consent(intruder_token)
 
     r = client.get(f"/api/v1/jump-analyses/{analysis_id}", headers=_auth_headers(intruder_token))
     assert r.status_code == 403
 
     # Tampoco puede crear un análisis para un athlete_id que no es el suyo
-    r = client.post(
-        "/api/v1/jump-analyses",
-        json={"athlete_id": owner_athlete_id, "video_reference": "s3://otro.mp4"},
-        headers=_auth_headers(intruder_token),
-    )
-    assert r.status_code == 403
+    r = upload_jump(intruder_token, owner_athlete_id)
+    assert (r.status_code, r.json()["code"]) == (403, "forbidden")
 
 
-def test_coach_can_view_assigned_athlete_but_not_create(client, register_and_verify, set_role):
+def test_coach_can_view_assigned_athlete_but_not_create(client, register_and_verify, set_role, grant_consent, upload_jump):
     athlete_token = register_and_verify("deportista@kinesiapp.com")
     athlete_id = _create_athlete_profile(client, athlete_token)
-    r = client.post(
-        "/api/v1/jump-analyses",
-        json={"athlete_id": athlete_id, "video_reference": "s3://video.mp4"},
-        headers=_auth_headers(athlete_token),
-    )
+    grant_consent(athlete_token)
+    r = upload_jump(athlete_token, athlete_id)
     analysis_id = r.json()["id"]
 
     coach_token = register_and_verify("coach@kinesiapp.com")
@@ -97,22 +85,17 @@ def test_coach_can_view_assigned_athlete_but_not_create(client, register_and_ver
     assert r.status_code == 200
     assert len(r.json()) == 1
 
-    r = client.post(
-        "/api/v1/jump-analyses",
-        json={"athlete_id": athlete_id, "video_reference": "s3://otro.mp4"},
-        headers=_auth_headers(coach_token),
-    )
-    assert r.status_code == 403
+    # Con consentimiento propio igual no puede: el deportista tiene cuenta, sube él
+    grant_consent(coach_token)
+    r = upload_jump(coach_token, athlete_id)
+    assert (r.status_code, r.json()["code"]) == (403, "forbidden")
 
 
-def test_admin_has_full_access_and_manages_roles(client, register_and_verify, set_role):
+def test_admin_has_full_access_and_manages_roles(client, register_and_verify, set_role, grant_consent, upload_jump):
     athlete_token = register_and_verify("otro-deportista@kinesiapp.com")
     athlete_id = _create_athlete_profile(client, athlete_token)
-    r = client.post(
-        "/api/v1/jump-analyses",
-        json={"athlete_id": athlete_id, "video_reference": "s3://video.mp4"},
-        headers=_auth_headers(athlete_token),
-    )
+    grant_consent(athlete_token)
+    r = upload_jump(athlete_token, athlete_id)
     analysis_id = r.json()["id"]
 
     admin_token = register_and_verify("admin2@kinesiapp.com")

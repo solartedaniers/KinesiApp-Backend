@@ -25,6 +25,10 @@ class UserRoleUpdate(BaseModel):
     role: UserRole
 
 
+class VideoConsentGrant(BaseModel):
+    version: int = Field(gt=0)
+
+
 class UserRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -36,3 +40,5 @@ class UserRead(BaseModel):
     is_verified: bool
     created_at: datetime
     avatar_data_url: str | None = None
+    video_consent_given_at: datetime | None = None
+    video_consent_version: int | None = None

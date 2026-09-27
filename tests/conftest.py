@@ -12,6 +12,8 @@ os.environ.setdefault("SMTP_FROM_NAME", "KinesiApp Test")
 os.environ.setdefault("OTP_EXPIRE_MINUTES", "10")
 # Videos subidos en tests: a un directorio temporal, nunca a backend/media
 os.environ.setdefault("VIDEO_UPLOAD_DIR", tempfile.mkdtemp(prefix="kinesiapp-videos-"))
+SERVICE_API_KEY = "test-service-api-key"
+os.environ["JUMP_ANALYSIS_SERVICE_API_KEY"] = SERVICE_API_KEY
 
 import re
 
@@ -21,6 +23,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.config import settings
 from app.core.database import Base, get_db, get_session_factory
 from app.main import app
 from app.models.user import User, UserRole
@@ -109,5 +112,35 @@ def set_role(db_session):
         user = db_session.query(User).filter(User.email == email).one()
         user.role = role
         db_session.commit()
+
+    return _do
+
+
+@pytest.fixture
+def grant_consent(client):
+    """Acepta la versión vigente del consentimiento de video para ese usuario."""
+
+    def _do(token: str) -> None:
+        r = client.post(
+            "/api/v1/users/me/video-consent",
+            json={"version": settings.VIDEO_CONSENT_VERSION},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+        assert r.status_code == 200, r.text
+
+    return _do
+
+
+@pytest.fixture
+def upload_jump(client):
+    """Sube un video de salto mínimo por POST /jump-analyses/upload y devuelve la respuesta."""
+
+    def _do(token: str, athlete_id: int, content_type: str = "video/mp4"):
+        return client.post(
+            "/api/v1/jump-analyses/upload",
+            data={"athlete_id": str(athlete_id)},
+            files={"video": ("jump.mp4", b"\x00" * 4096, content_type)},
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
     return _do

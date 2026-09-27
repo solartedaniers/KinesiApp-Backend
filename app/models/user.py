@@ -40,6 +40,10 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    # Consentimiento para grabar/subir video de saltos (docs/design/video-analysis-pipeline.md §8.4)
+    video_consent_given_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    video_consent_version: Mapped[int | None] = mapped_column(nullable=True)
+
     # Recuperación de contraseña por OTP enviado a email
     password_reset_code_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
     password_reset_code_attempts: Mapped[int] = mapped_column(default=0, nullable=False)

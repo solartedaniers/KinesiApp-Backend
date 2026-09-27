@@ -3,11 +3,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 from app.core.database import get_db, get_session_factory
-from app.core.security import get_current_user, require_roles
+from app.core.security import get_current_user, require_roles, require_service_api_key
 from app.models.user import User, UserRole
 from app.repositories.athlete_repository import AthleteRepository
 from app.repositories.jump_analysis_repository import JumpAnalysisRepository
-from app.schemas.jump_analysis import JumpAnalysisCreate, JumpAnalysisRead, JumpAnalysisResultIngest
+from app.schemas.jump_analysis import JumpAnalysisRead, JumpAnalysisResultIngest
 from app.services.jump_analysis_processor import JumpAnalysisProcessor, JumpVideoAnalyzer
 from app.services.jump_analysis_service import JumpAnalysisService
 from app.services.jump_video_storage import JumpVideoStorage
@@ -20,6 +20,7 @@ def _get_service(db: Session = Depends(get_db)) -> JumpAnalysisService:
         JumpAnalysisRepository(db),
         AthleteRepository(db),
         JumpVideoStorage(settings.VIDEO_UPLOAD_DIR, settings.MAX_VIDEO_UPLOAD_BYTES),
+        settings.VIDEO_CONSENT_VERSION,
     )
 
 
@@ -29,15 +30,6 @@ def _get_processor(
     return JumpAnalysisProcessor(
         session_factory, JumpVideoAnalyzer(settings.RISK_SAFE_KNEE_FLEXION_DEG)
     )
-
-
-@router.post("", response_model=JumpAnalysisRead, status_code=status.HTTP_201_CREATED)
-def create_analysis(
-    data: JumpAnalysisCreate,
-    current_user: User = Depends(get_current_user),
-    service: JumpAnalysisService = Depends(_get_service),
-) -> JumpAnalysisRead:
-    return service.create_analysis(current_user, data)
 
 
 @router.post("/upload", response_model=JumpAnalysisRead, status_code=status.HTTP_202_ACCEPTED)
@@ -84,14 +76,16 @@ def list_by_athlete(
     return service.list_by_athlete(current_user, athlete_id)
 
 
-@router.post("/{analysis_id}/results", response_model=JumpAnalysisRead)
+@router.post(
+    "/{analysis_id}/results",
+    response_model=JumpAnalysisRead,
+    dependencies=[Depends(require_service_api_key)],
+)
 def ingest_result(
     analysis_id: int,
     result: JumpAnalysisResultIngest,
     service: JumpAnalysisService = Depends(_get_service),
 ) -> JumpAnalysisRead:
-    # Endpoint que el pipeline de IA llama al terminar de procesar el video del salto.
-    # No lleva token de usuario KinesiApp: es un webhook de un sistema interno, no una
-    # sesión con rol. ponytail: sin auth de servicio (API key/mTLS) todavía; agregar si
-    # este endpoint queda expuesto fuera de la red interna
+    # Lo llama un proceso interno (pipeline de IA), no una persona: se autentica con
+    # la API key de servicio del header X-Service-Api-Key, no con el JWT de usuarios
     return service.ingest_result(analysis_id, result)
