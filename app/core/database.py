@@ -20,3 +20,9 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def get_session_factory() -> sessionmaker[Session]:
+    # Para trabajo en segundo plano: abre su propia sesión porque la del request
+    # ya está cerrada cuando la tarea corre. Los tests la sobrescriben.
+    return SessionLocal

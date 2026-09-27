@@ -48,6 +48,13 @@ class Settings(BaseSettings):
     SMTP_USE_SSL: bool = False
     SMTP_TIMEOUT_SECONDS: int = Field(default=15, gt=0, le=120)
 
+    # Videos de salto: se guardan en disco (backend/media/jump_videos) hasta que se procesan
+    VIDEO_UPLOAD_DIR: Path = Path(__file__).resolve().parents[2] / "media" / "jump_videos"
+    MAX_VIDEO_UPLOAD_BYTES: int = Field(default=100 * 1024 * 1024, gt=0)
+    # Flexión de rodilla al aterrizar considerada segura. Placeholder de diseño, no un valor
+    # clínico validado (ver docs/design/video-analysis-pipeline.md §5)
+    RISK_SAFE_KNEE_FLEXION_DEG: float = Field(default=60.0, gt=0)
+
     @property
     def database_url(self) -> URL:
         # URL.create escapa correctamente credenciales con @, :, / o %.

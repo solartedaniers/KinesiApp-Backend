@@ -1,5 +1,6 @@
 """Fixtures compartidas: una sola DB SQLite en memoria, reseteada por test."""
 import os
+import tempfile
 
 # Config SMTP de prueba: no se conecta a internet; SmtpEmailSender queda reemplazado
 # por el fixture email_outbox antes de enviar correos.
@@ -9,6 +10,8 @@ os.environ.setdefault("SMTP_USER", "test@kinesiapp.test")
 os.environ.setdefault("SMTP_PASSWORD", "test-password")
 os.environ.setdefault("SMTP_FROM_NAME", "KinesiApp Test")
 os.environ.setdefault("OTP_EXPIRE_MINUTES", "10")
+# Videos subidos en tests: a un directorio temporal, nunca a backend/media
+os.environ.setdefault("VIDEO_UPLOAD_DIR", tempfile.mkdtemp(prefix="kinesiapp-videos-"))
 
 import re
 
@@ -18,7 +21,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.core.database import Base, get_db
+from app.core.database import Base, get_db, get_session_factory
 from app.main import app
 from app.models.user import User, UserRole
 
@@ -37,6 +40,8 @@ def _override_get_db():
 
 
 app.dependency_overrides[get_db] = _override_get_db
+# Las tareas en segundo plano abren su propia sesión: también contra la DB de tests
+app.dependency_overrides[get_session_factory] = lambda: TestingSessionLocal
 
 
 @pytest.fixture(autouse=True)

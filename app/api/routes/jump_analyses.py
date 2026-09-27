@@ -1,19 +1,34 @@
-from fastapi import APIRouter, Depends, status
-from sqlalchemy.orm import Session
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile, status
+from sqlalchemy.orm import Session, sessionmaker
 
-from app.core.database import get_db
+from app.core.config import settings
+from app.core.database import get_db, get_session_factory
 from app.core.security import get_current_user, require_roles
 from app.models.user import User, UserRole
 from app.repositories.athlete_repository import AthleteRepository
 from app.repositories.jump_analysis_repository import JumpAnalysisRepository
 from app.schemas.jump_analysis import JumpAnalysisCreate, JumpAnalysisRead, JumpAnalysisResultIngest
+from app.services.jump_analysis_processor import JumpAnalysisProcessor, JumpVideoAnalyzer
 from app.services.jump_analysis_service import JumpAnalysisService
+from app.services.jump_video_storage import JumpVideoStorage
 
 router = APIRouter(prefix="/jump-analyses", tags=["jump-analyses"])
 
 
 def _get_service(db: Session = Depends(get_db)) -> JumpAnalysisService:
-    return JumpAnalysisService(JumpAnalysisRepository(db), AthleteRepository(db))
+    return JumpAnalysisService(
+        JumpAnalysisRepository(db),
+        AthleteRepository(db),
+        JumpVideoStorage(settings.VIDEO_UPLOAD_DIR, settings.MAX_VIDEO_UPLOAD_BYTES),
+    )
+
+
+def _get_processor(
+    session_factory: sessionmaker[Session] = Depends(get_session_factory),
+) -> JumpAnalysisProcessor:
+    return JumpAnalysisProcessor(
+        session_factory, JumpVideoAnalyzer(settings.RISK_SAFE_KNEE_FLEXION_DEG)
+    )
 
 
 @router.post("", response_model=JumpAnalysisRead, status_code=status.HTTP_201_CREATED)
@@ -23,6 +38,23 @@ def create_analysis(
     service: JumpAnalysisService = Depends(_get_service),
 ) -> JumpAnalysisRead:
     return service.create_analysis(current_user, data)
+
+
+@router.post("/upload", response_model=JumpAnalysisRead, status_code=status.HTTP_202_ACCEPTED)
+def upload_video(
+    background_tasks: BackgroundTasks,
+    athlete_id: int = Form(...),
+    video: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    service: JumpAnalysisService = Depends(_get_service),
+    processor: JumpAnalysisProcessor = Depends(_get_processor),
+) -> JumpAnalysisRead:
+    # `def` y no `async def`: la copia a disco corre en el threadpool, no en el event loop
+    analysis = service.create_from_upload(current_user, athlete_id, video.file, video.content_type)
+    # Corre después de enviar la respuesta: el cliente recibe 202 + PENDING al instante
+    # y consulta GET /{analysis_id} hasta ver PROCESSED o FAILED
+    background_tasks.add_task(processor.process, analysis.id)
+    return analysis
 
 
 # Antes de /{analysis_id}: si no, "team" se intentaría parsear como id

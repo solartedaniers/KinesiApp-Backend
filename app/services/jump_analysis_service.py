@@ -1,3 +1,5 @@
+from typing import BinaryIO
+
 from app.core.exceptions import ForbiddenException, NotFoundException
 from app.models.athlete import AthleteProfile
 from app.models.jump_analysis import JointAngleMeasurement, JumpAnalysis, JumpAnalysisStatus
@@ -5,6 +7,7 @@ from app.models.user import User, UserRole
 from app.repositories.athlete_repository import AthleteRepository
 from app.repositories.jump_analysis_repository import JumpAnalysisRepository
 from app.schemas.jump_analysis import JumpAnalysisCreate, JumpAnalysisResultIngest
+from app.services.jump_video_storage import JumpVideoStorage
 
 
 class JumpAnalysisService:
@@ -14,17 +17,34 @@ class JumpAnalysisService:
     KinesiApp con rol propio, así que queda fuera del chequeo de roles de este servicio.
     """
 
-    def __init__(self, repository: JumpAnalysisRepository, athlete_repository: AthleteRepository) -> None:
+    def __init__(
+        self,
+        repository: JumpAnalysisRepository,
+        athlete_repository: AthleteRepository,
+        video_storage: JumpVideoStorage,
+    ) -> None:
         self._repository = repository
         self._athlete_repository = athlete_repository
+        self._video_storage = video_storage
 
     def create_analysis(self, current_user: User, data: JumpAnalysisCreate) -> JumpAnalysis:
-        athlete = self._get_athlete_or_404(data.athlete_id)
-        # El propio deportista sube sus saltos; los gestionados (sin cuenta) los sube su coach
-        self._authorize_athlete_access(current_user, athlete, allow_coach=athlete.is_managed)
-
+        self._authorize_upload(current_user, data.athlete_id)
         analysis = JumpAnalysis(athlete_id=data.athlete_id, video_reference=data.video_reference)
         return self._repository.add(analysis)
+
+    def create_from_upload(
+        self, current_user: User, athlete_id: int, video: BinaryIO, content_type: str | None
+    ) -> JumpAnalysis:
+        # Se autoriza antes de escribir en disco: un intruso no llega a ocupar espacio
+        self._authorize_upload(current_user, athlete_id)
+        video_path = self._video_storage.save(video, content_type)
+        try:
+            return self._repository.add(
+                JumpAnalysis(athlete_id=athlete_id, video_reference=str(video_path))
+            )
+        except Exception:
+            self._video_storage.delete(video_path)
+            raise
 
     def get_analysis(self, current_user: User, analysis_id: int) -> JumpAnalysis:
         analysis = self._repository.get(analysis_id)
@@ -50,12 +70,22 @@ class JumpAnalysisService:
         analysis = self._repository.get(analysis_id)
         if analysis is None:
             raise NotFoundException("JumpAnalysis", analysis_id)
+        self.apply_result(analysis, result)
+        return self._repository.add(analysis)
+
+    @staticmethod
+    def apply_result(analysis: JumpAnalysis, result: JumpAnalysisResultIngest) -> None:
+        # Compartido por el webhook y por el procesamiento en segundo plano
         analysis.risk_score = result.risk_score
         analysis.status = JumpAnalysisStatus.PROCESSED
         analysis.angle_measurements = [
             JointAngleMeasurement(**measurement.model_dump()) for measurement in result.measurements
         ]
-        return self._repository.add(analysis)
+
+    def _authorize_upload(self, current_user: User, athlete_id: int) -> None:
+        athlete = self._get_athlete_or_404(athlete_id)
+        # El propio deportista sube sus saltos; los gestionados (sin cuenta) los sube su coach
+        self._authorize_athlete_access(current_user, athlete, allow_coach=athlete.is_managed)
 
     def _get_athlete_or_404(self, athlete_id: int) -> AthleteProfile:
         athlete = self._athlete_repository.get(athlete_id)

@@ -23,6 +23,8 @@ class ErrorCode(str, enum.Enum):
     EMAIL_DELIVERY_FAILED = "email_delivery_failed"
     PASSWORD_REUSED = "password_reused"
     INVALID_CURRENT_PASSWORD = "invalid_current_password"
+    INVALID_VIDEO = "invalid_video"
+    VIDEO_TOO_LARGE = "video_too_large"
 
 
 class AppException(Exception):
