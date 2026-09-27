@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: SecretStr = Field(min_length=1)
     SMTP_FROM: str = Field(min_length=3)
     SMTP_USE_TLS: bool = True
+    SMTP_USE_SSL: bool = False
+    SMTP_TIMEOUT_SECONDS: int = Field(default=15, gt=0, le=120)
 
     @property
     def database_url(self) -> URL:

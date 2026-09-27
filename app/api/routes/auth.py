@@ -1,8 +1,9 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.email import send_password_reset_email, send_verification_email
+from app.core.email import EmailDeliveryError, send_password_reset_email, send_verification_email
+from app.core.exceptions import ErrorCode, ServiceUnavailableException
 from app.core.security import get_current_user
 from app.models.user import User
 from app.repositories.refresh_token_repository import RefreshTokenRepository
@@ -27,22 +28,33 @@ def _get_service(db: Session = Depends(get_db)) -> AuthService:
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(
-    data: UserCreate, background_tasks: BackgroundTasks, service: AuthService = Depends(_get_service)
+    data: UserCreate, service: AuthService = Depends(_get_service)
 ) -> UserRead:
     user, code = service.register(data)
-    background_tasks.add_task(send_verification_email, user.email, code)
+    try:
+        send_verification_email(user.email, code)
+    except EmailDeliveryError as error:
+        raise ServiceUnavailableException(
+            "Verification email could not be delivered",
+            code=ErrorCode.EMAIL_DELIVERY_FAILED,
+        ) from error
     return user
 
 
 @router.post("/verification-code/request", status_code=status.HTTP_202_ACCEPTED)
 def request_verification_code(
     data: PasswordResetRequest,
-    background_tasks: BackgroundTasks,
     service: AuthService = Depends(_get_service),
 ) -> dict[str, str]:
     code = service.request_verification_code(data.email)
     if code is not None:
-        background_tasks.add_task(send_verification_email, data.email, code)
+        try:
+            send_verification_email(data.email, code)
+        except EmailDeliveryError as error:
+            raise ServiceUnavailableException(
+                "Verification email could not be delivered",
+                code=ErrorCode.EMAIL_DELIVERY_FAILED,
+            ) from error
     return {"detail": "If the account can be verified, a new code was sent"}
 
 
@@ -68,11 +80,17 @@ def logout(data: RefreshRequest, service: AuthService = Depends(_get_service)) -
 
 @router.post("/password-recovery/request", status_code=status.HTTP_202_ACCEPTED)
 def request_password_reset(
-    data: PasswordResetRequest, background_tasks: BackgroundTasks, service: AuthService = Depends(_get_service)
+    data: PasswordResetRequest, service: AuthService = Depends(_get_service)
 ) -> dict[str, str]:
     code = service.request_password_reset(data.email)
     if code is not None:
-        background_tasks.add_task(send_password_reset_email, data.email, code)
+        try:
+            send_password_reset_email(data.email, code)
+        except EmailDeliveryError as error:
+            raise ServiceUnavailableException(
+                "Password recovery email could not be delivered",
+                code=ErrorCode.EMAIL_DELIVERY_FAILED,
+            ) from error
     # Misma respuesta exista o no el email: evita que el endpoint sirva para enumerar usuarios
     return {"detail": "If the email exists, a recovery code was sent"}
 

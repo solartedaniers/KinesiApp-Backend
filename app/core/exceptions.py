@@ -20,6 +20,7 @@ class ErrorCode(str, enum.Enum):
     INVALID_OTP = "invalid_otp"
     INVALID_REFRESH_TOKEN = "invalid_refresh_token"
     INVALID_ROLE_ASSIGNMENT = "invalid_role_assignment"
+    EMAIL_DELIVERY_FAILED = "email_delivery_failed"
 
 
 class AppException(Exception):
@@ -66,6 +67,17 @@ class ForbiddenException(AppException):
 
     def __init__(self, detail: str, code: ErrorCode = ErrorCode.FORBIDDEN) -> None:
         super().__init__(detail=detail, status_code=status.HTTP_403_FORBIDDEN, code=code)
+
+
+class ServiceUnavailableException(AppException):
+    """Temporary dependency failure that prevents a requested operation."""
+
+    def __init__(self, detail: str, code: ErrorCode = ErrorCode.BAD_REQUEST) -> None:
+        super().__init__(
+            detail=detail,
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            code=code,
+        )
 
 
 async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:

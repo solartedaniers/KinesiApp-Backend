@@ -36,16 +36,17 @@ class AuthService:
         self._refresh_tokens = refresh_token_repository
 
     def register(self, data: UserCreate) -> tuple[User, str]:
-        if self._users.get_by_email(data.email) is not None:
+        existing_user = self._users.get_by_email(data.email)
+        if existing_user is not None and existing_user.is_verified:
             raise ConflictException(
                 f"Email '{data.email}' is already registered", code=ErrorCode.EMAIL_ALREADY_REGISTERED
             )
 
-        user = User(
-            email=data.email,
-            hashed_password=hash_password(data.password),
-            full_name=data.full_name,
-        )
+        user = existing_user or User(email=data.email)
+        user.hashed_password = hash_password(data.password)
+        user.full_name = data.full_name
+        user.is_active = False
+        user.is_verified = False
         code = self._assign_verification_code(user)
         return self._users.add(user), code
 
@@ -69,6 +70,7 @@ class AuthService:
         )
 
         user.is_verified = True
+        user.is_active = True
         user.verification_code_hash = None
         user.verification_code_expires_at = None
         user.verification_code_attempts = 0

@@ -20,6 +20,42 @@ def test_duplicate_registration_returns_email_already_registered_code(client, re
     assert r.json()["code"] == "email_already_registered"
 
 
+def test_unverified_registration_can_be_retried(client, email_outbox):
+    # Una cuenta sin verificar no debe bloquear un segundo intento con el mismo email
+    # (p. ej. el usuario no recibió el OTP, o dejó pasar el tiempo de espera).
+    payload = {"email": "pendiente@kinesiapp.com", "password": "supersecret1", "full_name": "Primero"}
+    r = client.post("/api/v1/auth/register", json=payload)
+    assert r.status_code == 201, r.text
+
+    payload["full_name"] = "Segundo"
+    r = client.post("/api/v1/auth/register", json=payload)
+    assert r.status_code == 201, r.text
+    assert r.json()["full_name"] == "Segundo"
+
+    # Sigue siendo una sola cuenta pendiente, no una duplicada
+    r = client.post(
+        "/api/v1/auth/login", json={"email": "pendiente@kinesiapp.com", "password": "supersecret1"}
+    )
+    assert r.status_code == 403
+    assert r.json()["code"] == "account_disabled"
+
+
+def test_email_delivery_failure_returns_email_delivery_failed_code(client, monkeypatch):
+    from app.core.email import EmailDeliveryError
+
+    def _boom(self, recipient, subject, body):
+        raise EmailDeliveryError("SMTP no disponible")
+
+    monkeypatch.setattr("app.core.email.EmailSender.send", _boom)
+
+    r = client.post(
+        "/api/v1/auth/register",
+        json={"email": "sinsmtp@kinesiapp.com", "password": "supersecret1", "full_name": "Sin SMTP"},
+    )
+    assert r.status_code == 503
+    assert r.json()["code"] == "email_delivery_failed"
+
+
 def test_not_found_returns_not_found_code(client, register_and_verify):
     token = register_and_verify("nf@kinesiapp.com")
     r = client.get("/api/v1/jump-analyses/99999", headers={"Authorization": f"Bearer {token}"})
