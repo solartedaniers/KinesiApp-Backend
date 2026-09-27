@@ -11,6 +11,7 @@ from app.repositories.user_repository import UserRepository
 from app.schemas.auth import (
     LoginRequest,
     OTPVerifyRequest,
+    PasswordChange,
     PasswordResetConfirm,
     PasswordResetRequest,
     RefreshRequest,
@@ -100,9 +101,23 @@ def request_password_reset(
     return {"detail": "If the email exists, a recovery code was sent"}
 
 
+@router.post("/password-recovery/verify", status_code=status.HTTP_204_NO_CONTENT)
+def verify_password_reset_code(data: OTPVerifyRequest, service: AuthService = Depends(_get_service)) -> None:
+    service.verify_password_reset_code(data.email, data.code)
+
+
 @router.post("/password-recovery/confirm", status_code=status.HTTP_204_NO_CONTENT)
 def confirm_password_reset(data: PasswordResetConfirm, service: AuthService = Depends(_get_service)) -> None:
     service.confirm_password_reset(data.email, data.code, data.new_password)
+
+
+@router.post("/password/change", response_model=TokenPair)
+def change_password(
+    data: PasswordChange,
+    current_user: User = Depends(get_current_user),
+    service: AuthService = Depends(_get_service),
+) -> TokenPair:
+    return service.change_password(current_user, data.current_password, data.new_password)
 
 
 @router.get("/me", response_model=UserRead)

@@ -10,11 +10,11 @@ def test_full_flow(client, register_and_verify):
 
     # Alta legacy (POST /users, sin verificación) sigue abierta; se cubre aparte su regla de unicidad
     r = client.post(
-        "/api/v1/users", json={"email": "legacy@a.com", "password": "12345678", "full_name": "Ana"}
+        "/api/v1/users", json={"email": "legacy@a.com", "password": "abcd1234", "full_name": "Ana"}
     )
     assert r.status_code == 201, r.text
     r = client.post(
-        "/api/v1/users", json={"email": "legacy@a.com", "password": "12345678", "full_name": "Ana"}
+        "/api/v1/users", json={"email": "legacy@a.com", "password": "abcd1234", "full_name": "Ana"}
     )
     assert r.status_code == 409
 

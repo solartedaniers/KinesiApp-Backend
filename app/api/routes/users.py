@@ -2,10 +2,11 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import require_roles
-from app.models.user import UserRole
+from app.core.security import get_current_user, require_roles
+from app.models.user import User, UserRole
 from app.repositories.user_repository import UserRepository
-from app.schemas.user import UserCreate, UserRead, UserRoleUpdate
+from app.schemas.avatar import AvatarUpload
+from app.schemas.user import UserCreate, UserProfileUpdate, UserRead, UserRoleUpdate
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -20,6 +21,32 @@ def create_user(data: UserCreate, service: UserService = Depends(_get_service)) 
     # Alta pública heredada de antes del módulo de auth; sigue abierta por compatibilidad.
     # El flujo "real" con verificación de email es /auth/register
     return service.create_user(data)
+
+
+# /me va antes que /{user_id}: la cuenta propia la edita cualquier rol autenticado
+@router.patch("/me", response_model=UserRead)
+def update_my_profile(
+    data: UserProfileUpdate,
+    current_user: User = Depends(get_current_user),
+    service: UserService = Depends(_get_service),
+) -> UserRead:
+    return service.update_profile(current_user, data)
+
+
+@router.put("/me/avatar", response_model=UserRead)
+def upload_my_avatar(
+    data: AvatarUpload,
+    current_user: User = Depends(get_current_user),
+    service: UserService = Depends(_get_service),
+) -> UserRead:
+    return service.set_avatar(current_user, data.to_data_url())
+
+
+@router.delete("/me/avatar", response_model=UserRead)
+def delete_my_avatar(
+    current_user: User = Depends(get_current_user), service: UserService = Depends(_get_service)
+) -> UserRead:
+    return service.set_avatar(current_user, None)
 
 
 # GET queda restringido a ADMIN: listar/consultar cuentas es gestión global del sistema

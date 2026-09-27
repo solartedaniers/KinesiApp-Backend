@@ -39,6 +39,10 @@ class JumpAnalysisService:
         self._authorize_athlete_access(current_user, athlete, allow_coach=True)
         return self._repository.list_by_athlete(athlete_id)
 
+    def list_for_coach(self, coach: User) -> list[JumpAnalysis]:
+        # Vista de equipo: los saltos de todos los deportistas a cargo del coach
+        return self._repository.list_by_coach(coach.id)
+
     def ingest_result(self, analysis_id: int, result: JumpAnalysisResultIngest) -> JumpAnalysis:
         # Punto de entrada donde el pipeline de IA reporta ángulos articulares y score de riesgo.
         # Este cómputo pesado corre en el pipeline externo, no en el hilo de este endpoint:

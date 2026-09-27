@@ -6,6 +6,7 @@ from app.core.security import require_roles
 from app.models.user import User, UserRole
 from app.repositories.athlete_repository import AthleteRepository
 from app.schemas.athlete import AthleteProfileRead, ManagedAthleteCreate, ManagedAthleteUpdate
+from app.schemas.avatar import AvatarUpload
 from app.services.managed_athlete_service import ManagedAthleteService
 
 router = APIRouter(prefix="/coach/athletes", tags=["coach-athletes"])
@@ -52,3 +53,22 @@ def delete_managed_athlete(
     service: ManagedAthleteService = Depends(_get_service),
 ) -> None:
     service.delete(coach.id, athlete_id)
+
+
+@router.put("/{athlete_id}/avatar", response_model=AthleteProfileRead)
+def upload_managed_athlete_avatar(
+    athlete_id: int,
+    data: AvatarUpload,
+    coach: User = Depends(_require_coach),
+    service: ManagedAthleteService = Depends(_get_service),
+) -> AthleteProfileRead:
+    return service.set_avatar(coach.id, athlete_id, data.to_data_url())
+
+
+@router.delete("/{athlete_id}/avatar", response_model=AthleteProfileRead)
+def delete_managed_athlete_avatar(
+    athlete_id: int,
+    coach: User = Depends(_require_coach),
+    service: ManagedAthleteService = Depends(_get_service),
+) -> AthleteProfileRead:
+    return service.set_avatar(coach.id, athlete_id, None)

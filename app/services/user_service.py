@@ -1,11 +1,8 @@
-from passlib.context import CryptContext
-
 from app.core.exceptions import ConflictException, ErrorCode, NotFoundException
+from app.core.security import hash_password
 from app.models.user import User, UserRole
 from app.repositories.user_repository import UserRepository
-from app.schemas.user import UserCreate
-
-_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+from app.schemas.user import UserCreate, UserProfileUpdate
 
 
 class UserService:
@@ -22,7 +19,7 @@ class UserService:
 
         user = User(
             email=data.email,
-            hashed_password=_pwd_context.hash(data.password),
+            hashed_password=hash_password(data.password),
             full_name=data.full_name,
             role=data.role,
         )
@@ -41,4 +38,12 @@ class UserService:
         # Único mecanismo para volverse COACH/ADMIN: un admin ya autenticado lo asigna
         user = self.get_user(user_id)
         user.role = role
+        return self._repository.add(user)
+
+    def update_profile(self, user: User, data: UserProfileUpdate) -> User:
+        user.full_name = data.full_name
+        return self._repository.add(user)
+
+    def set_avatar(self, user: User, avatar_data_url: str | None) -> User:
+        user.avatar_data_url = avatar_data_url
         return self._repository.add(user)

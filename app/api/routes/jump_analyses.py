@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import get_current_user
-from app.models.user import User
+from app.core.security import get_current_user, require_roles
+from app.models.user import User, UserRole
 from app.repositories.athlete_repository import AthleteRepository
 from app.repositories.jump_analysis_repository import JumpAnalysisRepository
 from app.schemas.jump_analysis import JumpAnalysisCreate, JumpAnalysisRead, JumpAnalysisResultIngest
@@ -23,6 +23,15 @@ def create_analysis(
     service: JumpAnalysisService = Depends(_get_service),
 ) -> JumpAnalysisRead:
     return service.create_analysis(current_user, data)
+
+
+# Antes de /{analysis_id}: si no, "team" se intentaría parsear como id
+@router.get("/team", response_model=list[JumpAnalysisRead])
+def list_team_analyses(
+    coach: User = Depends(require_roles(UserRole.COACH)),
+    service: JumpAnalysisService = Depends(_get_service),
+) -> list[JumpAnalysisRead]:
+    return service.list_for_coach(coach)
 
 
 @router.get("/{analysis_id}", response_model=JumpAnalysisRead)

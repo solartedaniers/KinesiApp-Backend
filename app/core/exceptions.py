@@ -21,6 +21,8 @@ class ErrorCode(str, enum.Enum):
     INVALID_REFRESH_TOKEN = "invalid_refresh_token"
     INVALID_ROLE_ASSIGNMENT = "invalid_role_assignment"
     EMAIL_DELIVERY_FAILED = "email_delivery_failed"
+    PASSWORD_REUSED = "password_reused"
+    INVALID_CURRENT_PASSWORD = "invalid_current_password"
 
 
 class AppException(Exception):

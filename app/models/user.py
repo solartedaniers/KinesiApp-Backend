@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, String, func
+from sqlalchemy import DateTime, Enum, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -29,6 +29,8 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.ATHLETE, nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Foto de perfil como data URL (ver app/schemas/avatar.py)
+    avatar_data_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     # Verificación de cuenta por OTP enviado a email
     is_verified: Mapped[bool] = mapped_column(default=False)

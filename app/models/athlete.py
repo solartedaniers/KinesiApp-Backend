@@ -1,7 +1,7 @@
 import enum
 from datetime import date
 
-from sqlalchemy import CheckConstraint, Date, Enum, Float, ForeignKey, String
+from sqlalchemy import CheckConstraint, Date, Enum, Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -41,6 +41,8 @@ class AthleteProfile(Base):
     height_cm: Mapped[float] = mapped_column(Float, nullable=False)
     weight_kg: Mapped[float] = mapped_column(Float, nullable=False)
     birth_date: Mapped[date] = mapped_column(Date, nullable=False)
+    # Solo para gestionados (la sube su coach): los ligados usan User.avatar_data_url
+    avatar_data_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     user: Mapped["User | None"] = relationship(back_populates="athlete_profile", foreign_keys=[user_id])
     coach: Mapped["User | None"] = relationship(back_populates="coached_athletes", foreign_keys=[coach_id])
@@ -55,3 +57,7 @@ class AthleteProfile(Base):
     @property
     def display_name(self) -> str:
         return self.full_name if self.is_managed else self.user.full_name
+
+    @property
+    def display_avatar(self) -> str | None:
+        return self.avatar_data_url if self.is_managed else self.user.avatar_data_url

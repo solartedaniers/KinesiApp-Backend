@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.user import UserRole
+from app.schemas.password_policy import StrongPassword
 
 # Roles elegibles en el alta pública: ADMIN queda fuera, solo otro admin lo asigna
 PublicSignupRole = Literal[UserRole.ATHLETE, UserRole.COACH]
@@ -11,9 +12,13 @@ PublicSignupRole = Literal[UserRole.ATHLETE, UserRole.COACH]
 
 class UserCreate(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
+    password: StrongPassword
     full_name: str = Field(min_length=1, max_length=150)
     role: PublicSignupRole = UserRole.ATHLETE
+
+
+class UserProfileUpdate(BaseModel):
+    full_name: str = Field(min_length=1, max_length=150)
 
 
 class UserRoleUpdate(BaseModel):
@@ -30,3 +35,4 @@ class UserRead(BaseModel):
     is_active: bool
     is_verified: bool
     created_at: datetime
+    avatar_data_url: str | None = None

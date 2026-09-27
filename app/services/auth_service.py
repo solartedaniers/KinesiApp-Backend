@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.core.config import settings
 from app.core.exceptions import (
+    AppException,
     ConflictException,
     ErrorCode,
     ForbiddenException,
@@ -122,8 +123,45 @@ class AuthService:
         self._users.add(user)
         return code
 
+    def verify_password_reset_code(self, email: str, code: str) -> None:
+        """Paso 2 de la recuperación: valida el OTP sin consumirlo (los fallos sí cuentan)."""
+        user = self._users.get_by_email(email)
+        if user is None:
+            # Mismo error que un código incorrecto: no revela qué emails existen
+            raise UnauthorizedException("Invalid or expired verification code", code=ErrorCode.INVALID_OTP)
+        self._validate_reset_code(user, code)
+
     def confirm_password_reset(self, email: str, code: str, new_password: str) -> None:
         user = self._get_user_by_email(email)
+        self._validate_reset_code(user, code)
+
+        self._replace_password(user, new_password)
+        user.password_reset_code_hash = None
+        user.password_reset_code_expires_at = None
+        user.password_reset_code_attempts = 0
+        self._users.add(user)
+        # Cambiar la contraseña invalida cualquier sesión previa (dispositivos robados/perdidos)
+        self._refresh_tokens.revoke_all_for_user(user.id)
+
+    def change_password(self, user: User, current_password: str, new_password: str) -> TokenPair:
+        """Cambio con sesión iniciada: exige la actual y emite tokens nuevos para este dispositivo."""
+        if not verify_password(current_password, user.hashed_password):
+            # 400 y no 401: un 401 dispararía el refresh de tokens en el cliente
+            raise AppException("Current password is incorrect", code=ErrorCode.INVALID_CURRENT_PASSWORD)
+        self._replace_password(user, new_password)
+        self._users.add(user)
+        self._refresh_tokens.revoke_all_for_user(user.id)
+        return self._issue_tokens(user)
+
+    def _replace_password(self, user: User, new_password: str) -> None:
+        # Se compara contra el hash bcrypt guardado: la contraseña nunca existe en texto plano
+        if verify_password(new_password, user.hashed_password):
+            raise ConflictException(
+                "New password must be different from the current one", code=ErrorCode.PASSWORD_REUSED
+            )
+        user.hashed_password = hash_password(new_password)
+
+    def _validate_reset_code(self, user: User, code: str) -> None:
         self._validate_otp(
             user,
             code,
@@ -132,14 +170,6 @@ class AuthService:
             user.password_reset_code_attempts,
             "password_reset_code_attempts",
         )
-
-        user.hashed_password = hash_password(new_password)
-        user.password_reset_code_hash = None
-        user.password_reset_code_expires_at = None
-        user.password_reset_code_attempts = 0
-        self._users.add(user)
-        # Cambiar la contraseña invalida cualquier sesión previa (dispositivos robados/perdidos)
-        self._refresh_tokens.revoke_all_for_user(user.id)
 
     def _issue_tokens(self, user: User) -> TokenPair:
         access_token = create_access_token(user.id)
