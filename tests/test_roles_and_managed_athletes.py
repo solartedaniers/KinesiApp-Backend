@@ -1,6 +1,6 @@
 """Rol elegido en el registro, edición del propio perfil y CRUD de deportistas gestionados por un coach."""
 
-PROFILE = {"sport": "running", "height_cm": 178, "weight_kg": 72, "birth_date": "1998-05-20"}
+PROFILE = {"gender": "male", "height_cm": 178, "weight_kg": 72, "birth_date": "1998-05-20"}
 
 
 def _auth(token: str) -> dict[str, str]:
@@ -34,10 +34,10 @@ def test_athlete_can_update_own_profile(client, register_and_verify):
     token = register_and_verify("editor@kinesiapp.com")
     client.post("/api/v1/athletes/me", json=PROFILE, headers=_auth(token))
 
-    r = client.patch("/api/v1/athletes/me", json={"weight_kg": 75.5, "sport": None}, headers=_auth(token))
+    r = client.patch("/api/v1/athletes/me", json={"weight_kg": 75.5, "gender": None}, headers=_auth(token))
     assert r.status_code == 200, r.text
     assert r.json()["weight_kg"] == 75.5
-    assert r.json()["sport"] == "running", "null explícito se ignora"
+    assert r.json()["gender"] == "male", "null explícito se ignora"
     assert r.json()["display_name"] == "Test User"
 
 
@@ -93,3 +93,40 @@ def test_athlete_cannot_use_coach_endpoints(client, register_and_verify):
     token = register_and_verify("sneaky@kinesiapp.com")
     r = client.post("/api/v1/coach/athletes", json={**PROFILE, "full_name": "X"}, headers=_auth(token))
     assert r.status_code == 403
+
+
+def test_managed_athlete_is_linked_to_its_coach(client, register_and_verify):
+    coach = register_and_verify("linked-coach@kinesiapp.com", role="coach")
+    coach_id = client.get("/api/v1/auth/me", headers=_auth(coach)).json()["id"]
+
+    created = client.post(
+        "/api/v1/coach/athletes", json={**PROFILE, "full_name": "Sofía"}, headers=_auth(coach)
+    ).json()
+    assert created["coach_id"] == coach_id
+
+    # Aparece de inmediato en los dos listados del coach, nunca como huérfano
+    assert [a["id"] for a in client.get("/api/v1/coach/athletes", headers=_auth(coach)).json()] == [created["id"]]
+    assert [a["id"] for a in client.get("/api/v1/athletes/coached", headers=_auth(coach)).json()] == [created["id"]]
+
+
+def test_coach_records_and_lists_analyses_of_managed_athlete(client, register_and_verify):
+    coach = register_and_verify("analyst-coach@kinesiapp.com", role="coach")
+    athlete_id = client.post(
+        "/api/v1/coach/athletes", json={**PROFILE, "full_name": "Mateo"}, headers=_auth(coach)
+    ).json()["id"]
+
+    r = client.post(
+        "/api/v1/jump-analyses",
+        json={"athlete_id": athlete_id, "video_reference": "s3://jump.mp4"},
+        headers=_auth(coach),
+    )
+    assert r.status_code == 201, r.text
+    r = client.get(f"/api/v1/jump-analyses/by-athlete/{athlete_id}", headers=_auth(coach))
+    assert len(r.json()) == 1
+
+
+def test_gender_is_required_and_validated(client, register_and_verify):
+    token = register_and_verify("gender@kinesiapp.com")
+    no_gender = {k: v for k, v in PROFILE.items() if k != "gender"}
+    assert client.post("/api/v1/athletes/me", json=no_gender, headers=_auth(token)).status_code == 422
+    assert client.post("/api/v1/athletes/me", json={**PROFILE, "gender": "x"}, headers=_auth(token)).status_code == 422

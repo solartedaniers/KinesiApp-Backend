@@ -20,8 +20,8 @@ class JumpAnalysisService:
 
     def create_analysis(self, current_user: User, data: JumpAnalysisCreate) -> JumpAnalysis:
         athlete = self._get_athlete_or_404(data.athlete_id)
-        # Sólo el propio deportista sube sus saltos; un admin puede hacerlo en su nombre
-        self._authorize_athlete_access(current_user, athlete, allow_coach=False)
+        # El propio deportista sube sus saltos; los gestionados (sin cuenta) los sube su coach
+        self._authorize_athlete_access(current_user, athlete, allow_coach=athlete.is_managed)
 
         analysis = JumpAnalysis(athlete_id=data.athlete_id, video_reference=data.video_reference)
         return self._repository.add(analysis)

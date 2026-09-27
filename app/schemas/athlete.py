@@ -2,9 +2,11 @@ from datetime import date
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from app.models.athlete import Gender
+
 
 class AthleteProfileBase(BaseModel):
-    sport: str = Field(min_length=1, max_length=100)
+    gender: Gender
     height_cm: float = Field(gt=0, le=300)
     weight_kg: float = Field(gt=0, le=400)
     birth_date: date
@@ -21,7 +23,7 @@ class AthleteProfileSelfCreate(AthleteProfileBase):
 class AthleteProfileUpdate(BaseModel):
     """Edición parcial de la ficha física: solo se aplican los campos enviados."""
 
-    sport: str | None = Field(default=None, min_length=1, max_length=100)
+    gender: Gender | None = None
     height_cm: float | None = Field(default=None, gt=0, le=300)
     weight_kg: float | None = Field(default=None, gt=0, le=400)
     birth_date: date | None = None
@@ -55,7 +57,7 @@ class AthleteProfileRead(BaseModel):
     coach_id: int | None
     display_name: str
     is_managed: bool
-    sport: str
+    gender: Gender
     height_cm: float
     weight_kg: float
     birth_date: date

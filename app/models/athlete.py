@@ -1,13 +1,22 @@
+import enum
 from datetime import date
 
-from sqlalchemy import CheckConstraint, Date, Float, ForeignKey, String
+from sqlalchemy import CheckConstraint, Date, Enum, Float, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
 
 
+class Gender(str, enum.Enum):
+    """Género del deportista: condiciona los rangos de referencia del análisis biomecánico."""
+
+    MALE = "male"
+    FEMALE = "female"
+    OTHER = "other"
+
+
 class AthleteProfile(Base):
-    """Datos deportivos de un deportista, usados como contexto para el análisis de lesiones.
+    """Ficha física de un futbolista, usados como contexto para el análisis de lesiones.
 
     Dos variantes: ligado a una cuenta (user_id) o gestionado por un coach sin cuenta
     propia (user_id nulo, full_name propio y coach_id obligatorio).
@@ -27,7 +36,8 @@ class AthleteProfile(Base):
     full_name: Mapped[str | None] = mapped_column(String(150), nullable=True)
     # Entrenador a cargo (rol COACH): asignado por un admin o creador del perfil gestionado
     coach_id: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    sport: Mapped[str] = mapped_column(String(100), nullable=False)
+    # La app es exclusiva de fútbol: no se guarda deporte, sí el género
+    gender: Mapped[Gender] = mapped_column(Enum(Gender, native_enum=False, length=10), nullable=False)
     height_cm: Mapped[float] = mapped_column(Float, nullable=False)
     weight_kg: Mapped[float] = mapped_column(Float, nullable=False)
     birth_date: Mapped[date] = mapped_column(Date, nullable=False)

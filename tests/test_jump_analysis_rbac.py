@@ -10,10 +10,10 @@ def _user_id(client, token: str) -> int:
     return client.get("/api/v1/auth/me", headers=_auth_headers(token)).json()["id"]
 
 
-def _create_athlete_profile(client, token: str, sport: str = "running") -> int:
+def _create_athlete_profile(client, token: str, gender: str = "male") -> int:
     r = client.post(
         "/api/v1/athletes/me",
-        json={"sport": sport, "height_cm": 170, "weight_kg": 65, "birth_date": "2000-01-01"},
+        json={"gender": gender, "height_cm": 170, "weight_kg": 65, "birth_date": "2000-01-01"},
         headers=_auth_headers(token),
     )
     assert r.status_code == 201, r.text
@@ -47,7 +47,7 @@ def test_other_athlete_cannot_access_analysis(client, register_and_verify):
     analysis_id = r.json()["id"]
 
     intruder_token = register_and_verify("intruso@kinesiapp.com")
-    _create_athlete_profile(client, intruder_token, sport="swimming")
+    _create_athlete_profile(client, intruder_token, gender="female")
 
     r = client.get(f"/api/v1/jump-analyses/{analysis_id}", headers=_auth_headers(intruder_token))
     assert r.status_code == 403

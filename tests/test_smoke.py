@@ -24,7 +24,7 @@ def test_full_flow(client, register_and_verify):
 
     r = client.post(
         "/api/v1/athletes/me",
-        json={"sport": "running", "height_cm": 170, "weight_kg": 65, "birth_date": "2000-01-01"},
+        json={"gender": "male", "height_cm": 170, "weight_kg": 65, "birth_date": "2000-01-01"},
         headers=headers,
     )
     assert r.status_code == 201, r.text
