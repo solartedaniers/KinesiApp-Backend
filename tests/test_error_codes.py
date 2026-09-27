@@ -46,7 +46,7 @@ def test_email_delivery_failure_returns_email_delivery_failed_code(client, monke
     def _boom(self, recipient, subject, body):
         raise EmailDeliveryError("SMTP no disponible")
 
-    monkeypatch.setattr("app.core.email.EmailSender.send", _boom)
+    monkeypatch.setattr("app.core.email.SmtpEmailSender.send", _boom)
 
     r = client.post(
         "/api/v1/auth/register",

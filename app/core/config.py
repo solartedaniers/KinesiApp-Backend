@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[3] / ".env",
         env_file_encoding="utf-8",
+        # Tolera variables obsoletas en .env (p. ej. el antiguo SMTP_FROM)
+        extra="ignore",
     )
 
     PROJECT_NAME: str = "KinesiApp API"
@@ -40,7 +42,8 @@ class Settings(BaseSettings):
     SMTP_PORT: int = Field(gt=0, le=65535)
     SMTP_USER: str = Field(min_length=1)
     SMTP_PASSWORD: SecretStr = Field(min_length=1)
-    SMTP_FROM: str = Field(min_length=3)
+    # Solo el nombre visible: la dirección remitente siempre es SMTP_USER (requisito de Gmail).
+    SMTP_FROM_NAME: str = "KinesiApp"
     SMTP_USE_TLS: bool = True
     SMTP_USE_SSL: bool = False
     SMTP_TIMEOUT_SECONDS: int = Field(default=15, gt=0, le=120)

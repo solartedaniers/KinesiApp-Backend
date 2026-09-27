@@ -1,13 +1,13 @@
 """Fixtures compartidas: una sola DB SQLite en memoria, reseteada por test."""
 import os
 
-# Config SMTP de prueba: no se conecta a internet; EmailSender queda reemplazado
+# Config SMTP de prueba: no se conecta a internet; SmtpEmailSender queda reemplazado
 # por el fixture email_outbox antes de enviar correos.
 os.environ.setdefault("SMTP_HOST", "smtp.test")
 os.environ.setdefault("SMTP_PORT", "587")
 os.environ.setdefault("SMTP_USER", "test@kinesiapp.test")
 os.environ.setdefault("SMTP_PASSWORD", "test-password")
-os.environ.setdefault("SMTP_FROM", "test@kinesiapp.test")
+os.environ.setdefault("SMTP_FROM_NAME", "KinesiApp Test")
 os.environ.setdefault("OTP_EXPIRE_MINUTES", "10")
 
 import re
@@ -58,7 +58,7 @@ def email_outbox(monkeypatch):
     def capture_email(sender, recipient, subject, body):
         messages.append({"to": recipient, "subject": subject, "body": body})
 
-    monkeypatch.setattr("app.core.email.EmailSender.send", capture_email)
+    monkeypatch.setattr("app.core.email.SmtpEmailSender.send", capture_email)
     return messages
 
 

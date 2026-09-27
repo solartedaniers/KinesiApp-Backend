@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.email import EmailDeliveryError, send_password_reset_email, send_verification_email
+from app.core.email import AuthEmailService, EmailDeliveryError, get_auth_email_service
 from app.core.exceptions import ErrorCode, ServiceUnavailableException
 from app.core.security import get_current_user
 from app.models.user import User
@@ -28,11 +28,13 @@ def _get_service(db: Session = Depends(get_db)) -> AuthService:
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register(
-    data: UserCreate, service: AuthService = Depends(_get_service)
+    data: UserCreate,
+    service: AuthService = Depends(_get_service),
+    email_service: AuthEmailService = Depends(get_auth_email_service),
 ) -> UserRead:
     user, code = service.register(data)
     try:
-        send_verification_email(user.email, code)
+        email_service.send_verification_code(user.email, code)
     except EmailDeliveryError as error:
         raise ServiceUnavailableException(
             "Verification email could not be delivered",
@@ -45,11 +47,12 @@ def register(
 def request_verification_code(
     data: PasswordResetRequest,
     service: AuthService = Depends(_get_service),
+    email_service: AuthEmailService = Depends(get_auth_email_service),
 ) -> dict[str, str]:
     code = service.request_verification_code(data.email)
     if code is not None:
         try:
-            send_verification_email(data.email, code)
+            email_service.send_verification_code(data.email, code)
         except EmailDeliveryError as error:
             raise ServiceUnavailableException(
                 "Verification email could not be delivered",
@@ -80,12 +83,14 @@ def logout(data: RefreshRequest, service: AuthService = Depends(_get_service)) -
 
 @router.post("/password-recovery/request", status_code=status.HTTP_202_ACCEPTED)
 def request_password_reset(
-    data: PasswordResetRequest, service: AuthService = Depends(_get_service)
+    data: PasswordResetRequest,
+    service: AuthService = Depends(_get_service),
+    email_service: AuthEmailService = Depends(get_auth_email_service),
 ) -> dict[str, str]:
     code = service.request_password_reset(data.email)
     if code is not None:
         try:
-            send_password_reset_email(data.email, code)
+            email_service.send_password_reset_code(data.email, code)
         except EmailDeliveryError as error:
             raise ServiceUnavailableException(
                 "Password recovery email could not be delivered",
