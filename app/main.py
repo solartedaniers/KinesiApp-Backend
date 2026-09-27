@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import athletes, auth, jump_analyses, users
+from app.api.routes import athletes, auth, jump_analyses, managed_athletes, users
 from app.core.config import settings
 from app.core.exceptions import AppException, app_exception_handler
 
@@ -26,6 +26,7 @@ app.add_middleware(
 app.include_router(auth.router, prefix=settings.API_V1_PREFIX)
 app.include_router(users.router, prefix=settings.API_V1_PREFIX)
 app.include_router(athletes.router, prefix=settings.API_V1_PREFIX)
+app.include_router(managed_athletes.router, prefix=settings.API_V1_PREFIX)
 app.include_router(jump_analyses.router, prefix=settings.API_V1_PREFIX)
 
 

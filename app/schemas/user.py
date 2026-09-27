@@ -1,16 +1,19 @@
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.user import UserRole
 
+# Roles elegibles en el alta pública: ADMIN queda fuera, solo otro admin lo asigna
+PublicSignupRole = Literal[UserRole.ATHLETE, UserRole.COACH]
+
 
 class UserCreate(BaseModel):
-    # Sin campo "role": todo alta pública nace ATHLETE, así se evita que el propio
-    # cliente se auto-asigne COACH/ADMIN en el registro
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
     full_name: str = Field(min_length=1, max_length=150)
+    role: PublicSignupRole = UserRole.ATHLETE
 
 
 class UserRoleUpdate(BaseModel):

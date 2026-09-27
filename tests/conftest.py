@@ -78,10 +78,10 @@ def register_and_verify(client, db_session, email_outbox):
     lo verifica y devuelve el access token. Compartida por todos los tests que necesitan
     un usuario autenticado sin repetir el flujo completo de /auth en cada archivo."""
 
-    def _do(email: str, password: str = "supersecret1") -> str:
+    def _do(email: str, password: str = "supersecret1", role: str = "athlete") -> str:
         r = client.post(
             "/api/v1/auth/register",
-            json={"email": email, "password": password, "full_name": "Test User"},
+            json={"email": email, "password": password, "full_name": "Test User", "role": role},
         )
         assert r.status_code == 201, r.text
 

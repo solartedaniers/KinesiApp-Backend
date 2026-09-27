@@ -24,8 +24,8 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(150), nullable=False)
-    # Todo registro público (POST /users, /auth/register) nace como ATHLETE; sólo un
-    # admin puede ascender una cuenta a COACH/ADMIN vía PATCH /users/{id}/role
+    # El registro público elige ATHLETE o COACH; ADMIN solo lo asigna otro admin
+    # vía PATCH /users/{id}/role
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.ATHLETE, nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

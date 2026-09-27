@@ -45,6 +45,7 @@ class AuthService:
         user = existing_user or User(email=data.email)
         user.hashed_password = hash_password(data.password)
         user.full_name = data.full_name
+        user.role = data.role
         user.is_active = False
         user.is_verified = False
         code = self._assign_verification_code(user)

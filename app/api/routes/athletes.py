@@ -10,6 +10,7 @@ from app.schemas.athlete import (
     AthleteProfileCreate,
     AthleteProfileRead,
     AthleteProfileSelfCreate,
+    AthleteProfileUpdate,
     CoachAssignment,
 )
 from app.services.athlete_service import AthleteService
@@ -38,6 +39,15 @@ def get_my_profile(
     service: AthleteService = Depends(_get_service),
 ) -> AthleteProfileRead:
     return service.get_own_profile(current_user.id)
+
+
+@router.patch("/me", response_model=AthleteProfileRead)
+def update_my_profile(
+    data: AthleteProfileUpdate,
+    current_user: User = Depends(require_roles(UserRole.ATHLETE)),
+    service: AthleteService = Depends(_get_service),
+) -> AthleteProfileRead:
+    return service.update_own_profile(current_user.id, data)
 
 
 @router.get("/coached", response_model=list[AthleteProfileRead])

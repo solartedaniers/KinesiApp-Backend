@@ -15,3 +15,14 @@ class AthleteRepository(BaseRepository[AthleteProfile]):
         return list(
             self._db.query(AthleteProfile).filter(AthleteProfile.coach_id == coach_id).all()
         )
+
+    def get_managed_by_coach(self, athlete_id: int, coach_id: int) -> AthleteProfile | None:
+        return (
+            self._db.query(AthleteProfile)
+            .filter(
+                AthleteProfile.id == athlete_id,
+                AthleteProfile.coach_id == coach_id,
+                AthleteProfile.user_id.is_(None),
+            )
+            .first()
+        )
