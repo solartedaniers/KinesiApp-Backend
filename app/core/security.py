@@ -20,7 +20,7 @@ _bearer_scheme = HTTPBearer(auto_error=True)
 # Header propio para procesos internos: no se mezcla con el JWT de los usuarios
 _service_api_key_scheme = APIKeyHeader(name="X-Service-Api-Key", auto_error=False)
 
-TokenType = Literal["access", "refresh"]
+TokenType = Literal["access", "refresh", "video"]
 
 
 def hash_password(password: str) -> str:
@@ -79,6 +79,20 @@ def create_refresh_token(user_id: int) -> tuple[str, datetime]:
     }
     token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return token, expires_at
+
+
+def create_video_access_token(analysis_id: int) -> tuple[str, datetime]:
+    # Sólo sirve para GET /jump-analyses/{analysis_id}/video: tipo "video" (get_current_user
+    # lo rechaza como access token) y el sub es el análisis, no un usuario
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.VIDEO_ACCESS_TOKEN_EXPIRE_MINUTES)
+    payload = {"sub": str(analysis_id), "type": "video", "exp": expires_at}
+    token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return token, expires_at
+
+
+def verify_video_access_token(token: str, analysis_id: int) -> None:
+    if decode_token(token, expected_type="video").get("sub") != str(analysis_id):
+        raise UnauthorizedException("Token is not valid for this video")
 
 
 def decode_token(token: str, expected_type: TokenType) -> dict:

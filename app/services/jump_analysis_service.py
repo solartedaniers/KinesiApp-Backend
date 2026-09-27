@@ -1,8 +1,9 @@
+from pathlib import Path
 from typing import BinaryIO
 
 from app.core.exceptions import ErrorCode, ForbiddenException, NotFoundException
 from app.models.athlete import AthleteProfile
-from app.models.jump_analysis import JointAngleMeasurement, JumpAnalysis, JumpAnalysisStatus
+from app.models.jump_analysis import JointAngleMeasurement, JumpAnalysis, JumpAnalysisStatus, MovementType
 from app.models.user import User, UserRole
 from app.repositories.athlete_repository import AthleteRepository
 from app.repositories.jump_analysis_repository import JumpAnalysisRepository
@@ -30,7 +31,12 @@ class JumpAnalysisService:
         self._required_consent_version = required_consent_version
 
     def create_from_upload(
-        self, current_user: User, athlete_id: int, video: BinaryIO, content_type: str | None
+        self,
+        current_user: User,
+        athlete_id: int,
+        movement_type: MovementType,
+        video: BinaryIO,
+        content_type: str | None,
     ) -> JumpAnalysis:
         # Se autoriza antes de escribir en disco: un intruso no llega a ocupar espacio
         self._authorize_upload(current_user, athlete_id)
@@ -38,7 +44,9 @@ class JumpAnalysisService:
         video_path = self._video_storage.save(video, content_type)
         try:
             return self._repository.add(
-                JumpAnalysis(athlete_id=athlete_id, video_reference=str(video_path))
+                JumpAnalysis(
+                    athlete_id=athlete_id, movement_type=movement_type, video_reference=str(video_path)
+                )
             )
         except Exception:
             self._video_storage.delete(video_path)
@@ -51,6 +59,17 @@ class JumpAnalysisService:
         athlete = self._get_athlete_or_404(analysis.athlete_id)
         self._authorize_athlete_access(current_user, athlete, allow_coach=True)
         return analysis
+
+    def get_video_path(self, analysis_id: int) -> Path:
+        # Sin chequeo de rol: quien llega aquí ya presentó un token de video emitido
+        # tras pasar get_analysis (ver la ruta /{analysis_id}/video)
+        analysis = self._repository.get(analysis_id)
+        if analysis is None:
+            raise NotFoundException("JumpAnalysis", analysis_id)
+        path = Path(analysis.video_reference)
+        if not path.is_file():
+            raise NotFoundException("JumpVideo", analysis_id, code=ErrorCode.VIDEO_NOT_FOUND)
+        return path
 
     def list_by_athlete(self, current_user: User, athlete_id: int) -> list[JumpAnalysis]:
         athlete = self._get_athlete_or_404(athlete_id)

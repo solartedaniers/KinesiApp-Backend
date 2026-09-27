@@ -27,6 +27,7 @@ class ErrorCode(str, enum.Enum):
     VIDEO_TOO_LARGE = "video_too_large"
     INVALID_SERVICE_API_KEY = "invalid_service_api_key"
     CONSENT_REQUIRED = "consent_required"
+    VIDEO_NOT_FOUND = "video_not_found"
 
 
 class AppException(Exception):

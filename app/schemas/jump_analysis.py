@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.jump_analysis import JumpAnalysisStatus
+from app.models.jump_analysis import JumpAnalysisStatus, MovementType
 
 
 class JointAngleMeasurementCreate(BaseModel):
@@ -35,7 +35,15 @@ class JumpAnalysisRead(BaseModel):
     id: int
     athlete_id: int
     # Sin video_reference: es una ruta de disco del servidor y el cliente no la necesita
+    movement_type: MovementType
     status: JumpAnalysisStatus
     risk_score: float | None
     recorded_at: datetime
     angle_measurements: list[JointAngleMeasurementRead] = []
+
+
+class VideoAccessRead(BaseModel):
+    """Token de corta vida para reproducir el video de un análisis."""
+
+    token: str
+    expires_at: datetime

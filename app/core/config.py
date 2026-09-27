@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     JUMP_ANALYSIS_SERVICE_API_KEY: SecretStr | None = None
     # Versión vigente del texto de consentimiento de video: subir exige haber aceptado ésta
     VIDEO_CONSENT_VERSION: int = Field(default=1, gt=0)
+    # Vida del token que autoriza reproducir un video (va en la URL: los reproductores
+    # no pueden mandar el header Authorization), por eso corta
+    VIDEO_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=10, gt=0)
 
     @property
     def database_url(self) -> URL:

@@ -13,6 +13,8 @@ os.environ.setdefault("OTP_EXPIRE_MINUTES", "10")
 # Videos subidos en tests: a un directorio temporal, nunca a backend/media
 os.environ.setdefault("VIDEO_UPLOAD_DIR", tempfile.mkdtemp(prefix="kinesiapp-videos-"))
 SERVICE_API_KEY = "test-service-api-key"
+# Contenido del video de prueba: distinto byte a byte para verificar lo que se reproduce
+VIDEO_BYTES = bytes(range(256)) * 16
 os.environ["JUMP_ANALYSIS_SERVICE_API_KEY"] = SERVICE_API_KEY
 
 import re
@@ -135,11 +137,14 @@ def grant_consent(client):
 def upload_jump(client):
     """Sube un video de salto mínimo por POST /jump-analyses/upload y devuelve la respuesta."""
 
-    def _do(token: str, athlete_id: int, content_type: str = "video/mp4"):
+    def _do(token: str, athlete_id: int, content_type: str = "video/mp4", movement_type: str | None = None):
+        data = {"athlete_id": str(athlete_id)}
+        if movement_type is not None:
+            data["movement_type"] = movement_type
         return client.post(
             "/api/v1/jump-analyses/upload",
-            data={"athlete_id": str(athlete_id)},
-            files={"video": ("jump.mp4", b"\x00" * 4096, content_type)},
+            data=data,
+            files={"video": ("jump.mp4", VIDEO_BYTES, content_type)},
             headers={"Authorization": f"Bearer {token}"},
         )
 

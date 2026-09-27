@@ -15,6 +15,14 @@ class JumpAnalysisStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class MovementType(str, enum.Enum):
+    """Qué gesto se grabó. Hoy sólo se guarda: el análisis es el mismo para ambos hasta
+    validar el spike con videos reales de sentadilla."""
+
+    JUMP = "jump"
+    SQUAT = "squat"
+
+
 class JumpAnalysis(Base):
     """Un salto capturado en video, pendiente o ya procesado por el modelo de IA."""
 
@@ -23,6 +31,9 @@ class JumpAnalysis(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     athlete_id: Mapped[int] = mapped_column(ForeignKey("athlete_profiles.id"), nullable=False)
     video_reference: Mapped[str] = mapped_column(String(500), nullable=False)
+    movement_type: Mapped[MovementType] = mapped_column(
+        Enum(MovementType), default=MovementType.JUMP, server_default=MovementType.JUMP.name, nullable=False
+    )
     status: Mapped[JumpAnalysisStatus] = mapped_column(
         Enum(JumpAnalysisStatus), default=JumpAnalysisStatus.PENDING, nullable=False
     )
