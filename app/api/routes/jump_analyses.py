@@ -81,6 +81,15 @@ def get_analysis(
     return service.get_analysis(current_user, analysis_id)
 
 
+@router.delete("/{analysis_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_analysis(
+    analysis_id: int,
+    current_user: User = Depends(get_current_user),
+    service: JumpAnalysisService = Depends(_get_service),
+) -> None:
+    service.delete_analysis(current_user, analysis_id)
+
+
 @router.get("/{analysis_id}/video-access", response_model=VideoAccessRead)
 def get_video_access(
     analysis_id: int,

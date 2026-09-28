@@ -47,6 +47,8 @@ class JumpVideoStorage:
             raise
         return target
 
-    @staticmethod
-    def delete(path: Path) -> None:
-        path.unlink(missing_ok=True)
+    def delete(self, path: Path) -> None:
+        # Sólo borra dentro del directorio de videos: una video_reference vieja o
+        # manipulada nunca puede apuntar a otro archivo del servidor
+        if path.resolve().is_relative_to(self._directory.resolve()):
+            path.unlink(missing_ok=True)

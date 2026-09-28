@@ -60,6 +60,15 @@ class JumpAnalysisService:
         self._authorize_athlete_access(current_user, athlete, allow_coach=True)
         return analysis
 
+    def delete_analysis(self, current_user: User, analysis_id: int) -> None:
+        # Mismo criterio de acceso que la lectura (get_analysis): dueño, coach asignado o admin
+        analysis = self.get_analysis(current_user, analysis_id)
+        video_path = Path(analysis.video_reference)
+        # Primero la fila (arrastra sus mediciones por cascade del ORM) y después el
+        # archivo: si el commit falla, el video sigue en disco y nada queda a medias
+        self._repository.delete(analysis)
+        self._video_storage.delete(video_path)
+
     def get_video_path(self, analysis_id: int) -> Path:
         # Sin chequeo de rol: quien llega aquí ya presentó un token de video emitido
         # tras pasar get_analysis (ver la ruta /{analysis_id}/video)
