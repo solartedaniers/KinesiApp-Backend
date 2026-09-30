@@ -26,7 +26,9 @@ class JumpVideoStorage:
                 ErrorCode.INVALID_VIDEO,
             )
         self._directory.mkdir(parents=True, exist_ok=True)
-        suffix = mimetypes.guess_extension(content_type) or ".bin"
+        # Sin parámetros: guess_extension("video/webm;codecs=vp8") da None y el video
+        # quedaría como .bin, servido como octet-stream (Safari no lo reproduce)
+        suffix = mimetypes.guess_extension(content_type.split(";")[0].strip()) or ".bin"
         target = self._directory / f"{uuid.uuid4().hex}{suffix}"
         written = 0
         try:
