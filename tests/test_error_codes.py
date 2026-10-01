@@ -37,6 +37,19 @@ def test_unverified_registration_can_be_retried(client, email_outbox):
         "/api/v1/auth/login", json={"email": "pendiente@kinesiapp.com", "password": "supersecret1"}
     )
     assert r.status_code == 403
+    assert r.json()["code"] == "email_not_verified"
+
+
+def test_login_of_deactivated_verified_account_returns_account_disabled(client, register_and_verify, db_session):
+    from app.models.user import User
+
+    register_and_verify("baja@kinesiapp.com")
+    user = db_session.query(User).filter(User.email == "baja@kinesiapp.com").one()
+    user.is_active = False
+    db_session.commit()
+
+    r = client.post("/api/v1/auth/login", json={"email": "baja@kinesiapp.com", "password": "supersecret1"})
+    assert r.status_code == 403
     assert r.json()["code"] == "account_disabled"
 
 

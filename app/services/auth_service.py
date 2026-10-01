@@ -83,10 +83,12 @@ class AuthService:
         user = self._users.get_by_email(email)
         if user is None or not verify_password(password, user.hashed_password):
             raise UnauthorizedException("Incorrect email or password", code=ErrorCode.INVALID_CREDENTIALS)
-        if not user.is_active:
-            raise ForbiddenException("Account is disabled", code=ErrorCode.ACCOUNT_DISABLED)
+        # Verificado antes que activo: el registro deja is_active=False hasta verificar, así que
+        # al revés una cuenta pendiente recibiría "deshabilitada" en vez de "verifica tu correo"
         if not user.is_verified:
             raise ForbiddenException("You must verify your email before logging in", code=ErrorCode.EMAIL_NOT_VERIFIED)
+        if not user.is_active:
+            raise ForbiddenException("Account is disabled", code=ErrorCode.ACCOUNT_DISABLED)
 
         return self._issue_tokens(user)
 
