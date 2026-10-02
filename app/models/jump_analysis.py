@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, func
+from sqlalchemy import JSON, DateTime, Enum, Float, ForeignKey, Integer, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -39,6 +39,9 @@ class JumpAnalysis(Base):
     risk_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     # Patrón que determinó el risk_score; None si ninguno se disparó
     dominant_risk_pattern: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Desglose por patrón, señal y repetición (app/analysis/risk_details.py). NULL en los análisis
+    # procesados antes de que existiera: el chat los atiende en modo reducido (diseño §6.3)
+    risk_details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # Con qué modelo y qué reglas se calculó, para no reinterpretar resultados viejos
     pose_model_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
     risk_model_version: Mapped[str | None] = mapped_column(String(50), nullable=True)

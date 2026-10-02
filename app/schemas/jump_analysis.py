@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -19,6 +20,7 @@ class JumpAnalysisResultIngest(BaseModel):
     risk_score: float = Field(ge=0, le=1)
     measurements: list[JointAngleMeasurementCreate]
     dominant_risk_pattern: str | None = Field(default=None, max_length=50)
+    risk_details: dict[str, Any] | None = None
     pose_model_version: str | None = Field(default=None, max_length=100)
     risk_model_version: str | None = Field(default=None, max_length=50)
 
