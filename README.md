@@ -10,6 +10,9 @@ Startup order matters: the schema must be migrated before the app (or the admin 
 ```bash
 pip install -r requirements-dev.txt
 
+# 0. Download the pose model (the Docker image does this at build time, pinned by checksum)
+curl -L -o models/pose_landmarker_full.task   https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task
+
 # 1. Start Postgres (see docker-compose.yml at the repo root)
 docker compose up -d db
 
@@ -78,3 +81,8 @@ never live in the repo.
 ```bash
 pytest
 ```
+
+`tests/test_analysis_real_videos.py` runs MediaPipe on the spike videos
+(`spikes/pose_spike/videos/`, not versioned) and is skipped when they or the model are missing.
+Every other test runs without MediaPipe: the API tests swap the analyzer for a stub
+(`tests/conftest.py`).
