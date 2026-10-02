@@ -19,6 +19,7 @@ from app.repositories.athlete_repository import AthleteRepository
 from app.repositories.jump_analysis_repository import JumpAnalysisRepository
 from app.schemas.jump_analysis import JumpAnalysisRead, JumpAnalysisResultIngest, VideoAccessRead
 from app.services.jump_analysis_processor import JumpAnalysisProcessor, JumpVideoAnalyzer
+from app.services.jump_video_analyzer_factory import get_jump_video_analyzer
 from app.services.jump_analysis_service import JumpAnalysisService
 from app.services.jump_video_storage import JumpVideoStorage
 
@@ -36,10 +37,9 @@ def _get_service(db: Session = Depends(get_db)) -> JumpAnalysisService:
 
 def _get_processor(
     session_factory: sessionmaker[Session] = Depends(get_session_factory),
+    analyzer: JumpVideoAnalyzer = Depends(get_jump_video_analyzer),
 ) -> JumpAnalysisProcessor:
-    return JumpAnalysisProcessor(
-        session_factory, JumpVideoAnalyzer(settings.RISK_SAFE_KNEE_FLEXION_DEG)
-    )
+    return JumpAnalysisProcessor(session_factory, analyzer)
 
 
 @router.post("/upload", response_model=JumpAnalysisRead, status_code=status.HTTP_202_ACCEPTED)
