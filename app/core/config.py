@@ -51,9 +51,55 @@ class Settings(BaseSettings):
     # Videos de salto: se guardan en disco (backend/media/jump_videos) hasta que se procesan
     VIDEO_UPLOAD_DIR: Path = Path(__file__).resolve().parents[2] / "media" / "jump_videos"
     MAX_VIDEO_UPLOAD_BYTES: int = Field(default=100 * 1024 * 1024, gt=0)
-    # Flexión de rodilla al aterrizar considerada segura. Placeholder de diseño, no un valor
-    # clínico validado (ver docs/design/video-analysis-pipeline.md §5)
-    RISK_SAFE_KNEE_FLEXION_DEG: float = Field(default=60.0, gt=0)
+
+    # Análisis de pose (docs/design/video-analysis-pipeline.md §5). La versión se guarda en cada
+    # análisis: cambiar de modelo exige cambiarla también
+    POSE_MODEL_PATH: Path = Path(__file__).resolve().parents[2] / "models" / "pose_landmarker_full.task"
+    POSE_MODEL_VERSION: str = "mediapipe-pose_landmarker_full-float16-v1"
+    POSE_MIN_DETECTION_CONFIDENCE: float = Field(default=0.5, ge=0, le=1)
+    LANDMARK_VISIBILITY_THRESHOLD: float = Field(default=0.1, ge=0, le=1)
+    LANDMARK_SMOOTHING_WINDOW_FRAMES: int = Field(default=3, ge=1)
+
+    # Detección de fases. Calibradas con un solo par de videos por ejercicio (§12): no definitivas
+    JUMP_HIP_APEX_PROMINENCE: float = Field(default=0.08, gt=0)
+    JUMP_HIP_APEX_MIN_DISTANCE_SECONDS: float = Field(default=0.6, gt=0)
+    JUMP_APEX_AIRBORNE_BODY_FRACTION: float = Field(default=0.06, gt=0)
+    JUMP_AIRBORNE_BODY_FRACTION: float = Field(default=0.03, gt=0)
+    JUMP_GROUND_WINDOW_SECONDS: float = Field(default=1.0, gt=0)
+    JUMP_GROUND_PERCENTILE: float = Field(default=90.0, ge=0, le=100)
+    JUMP_LANDING_WINDOW_MS: int = Field(default=300, gt=0)
+    JUMP_LANDING_END_MARGIN_FRAMES: int = Field(default=3, ge=0)
+    SQUAT_BOTTOM_MIN_PROMINENCE_DEG: float = Field(default=25.0, gt=0)
+    SQUAT_BOTTOM_MIN_FLEXION_DEG: float = Field(default=50.0, ge=0)
+    SQUAT_BOTTOM_MIN_DISTANCE_SECONDS: float = Field(default=0.6, gt=0)
+    SQUAT_BOTTOM_WINDOW_MS: int = Field(default=200, ge=0)
+    # Respaldo cuando la rodilla no deja picos (bisagra de cadera con piernas casi rectas): el
+    # umbral de tronco es RISK_SQUAT_TRUNK_LEAN_ONSET_DEG, el mismo donde empieza el riesgo
+    SQUAT_HINGE_MIN_DURATION_SECONDS: float = Field(default=0.3, gt=0)
+
+    # Umbrales de riesgo: placeholders de orden de magnitud tomados del spike, SIN validación
+    # clínica (§5, §5.6). Cada parcial es una rampa de "onset" (0) a "saturation" (1)
+    RISK_MODEL_VERSION: str = "risk-patterns-v1"
+    RISK_JUMP_KNEE_RIGID_ONSET_DEG: float = 60.0
+    RISK_JUMP_KNEE_RIGID_SATURATION_DEG: float = 30.0
+    RISK_JUMP_KNEE_DEEP_ONSET_DEG: float = 80.0
+    RISK_JUMP_KNEE_DEEP_SATURATION_DEG: float = 100.0
+    RISK_JUMP_TRUNK_LEAN_ONSET_DEG: float = 25.0
+    RISK_JUMP_TRUNK_LEAN_SATURATION_DEG: float = 45.0
+    RISK_JUMP_PATTERNS: dict[str, list[str]] = {
+        "rigid_landing": ["knee_rigid"],
+        "forward_collapse": ["knee_deep", "trunk_lean"],
+        "trunk_lean": ["trunk_lean"],
+    }
+    # Sentadilla: el riesgo es inclinar el tronco EN LUGAR de flexionar la rodilla (rampa de
+    # rodilla descendente: menos flexión, más riesgo)
+    RISK_SQUAT_KNEE_SHALLOW_ONSET_DEG: float = 90.0
+    RISK_SQUAT_KNEE_SHALLOW_SATURATION_DEG: float = 80.0
+    RISK_SQUAT_TRUNK_LEAN_ONSET_DEG: float = 70.0
+    RISK_SQUAT_TRUNK_LEAN_SATURATION_DEG: float = 90.0
+    RISK_SQUAT_PATTERNS: dict[str, list[str]] = {
+        "hip_hinge_squat": ["squat_trunk_lean", "squat_knee_shallow"],
+    }
 
     # Clave del proceso interno que reporta resultados a POST /jump-analyses/{id}/results.
     # Sin definir, ese endpoint rechaza toda llamada (cerrado por defecto)

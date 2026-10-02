@@ -3,3 +3,7 @@ __pycache__
 .env
 .venv
 venv
+# El modelo se descarga en el build; el spike trae videos y su propio venv
+models
+spikes
+media
