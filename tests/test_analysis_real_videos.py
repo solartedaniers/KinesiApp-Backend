@@ -56,3 +56,17 @@ def test_results_record_the_model_and_rule_versions(results):
 def test_same_video_gives_the_same_result(results):
     rerun = build_jump_video_analyzer(settings).analyze(VIDEOS_DIR / "salto_mal_echo.mp4", MovementType.JUMP)
     assert rerun == results["salto_mal_echo.mp4"]
+
+
+def test_risk_details_explain_the_bad_jump_and_squat_with_measured_values(results):
+    jump = results["salto_mal_echo.mp4"].risk_details
+    collapse = jump["patterns"]["forward_collapse"]
+    assert collapse["repetitions_triggered"] == jump["repetitions_evaluated"] > 0
+    assert collapse["signals"]["knee_deep"]["measured_deg"]["median"] > settings.RISK_JUMP_KNEE_DEEP_ONSET_DEG
+    assert collapse["signals"]["trunk_lean"]["measured_deg"]["median"] > settings.RISK_JUMP_TRUNK_LEAN_ONSET_DEG
+
+    squat = results["sentadilla_mal_echa.mp4"].risk_details
+    hinge = squat["patterns"]["hip_hinge_squat"]
+    assert squat["detection_methods"] == {"knee_bottom": squat["repetitions_evaluated"]}
+    assert hinge["signals"]["squat_trunk_lean"]["measured_deg"]["min"] > settings.RISK_SQUAT_TRUNK_LEAN_ONSET_DEG
+    assert hinge["signals"]["squat_knee_shallow"]["direction"] == "lower_is_riskier"

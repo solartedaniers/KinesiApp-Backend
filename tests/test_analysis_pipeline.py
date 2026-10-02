@@ -8,6 +8,7 @@ from app.analysis.errors import NoMovementDetectedError, UnreadableVideoError
 from app.analysis.pose_extraction import VideoPoseExtractor
 from app.analysis.pose_series import PoseSeries
 from app.analysis.preprocessing import LandmarkSeriesPreprocessor
+from app.analysis.risk_details import RiskDetailsSerializer
 from app.analysis.video_reader import VideoFrameReader
 from app.core.config import settings
 from app.models.jump_analysis import JumpAnalysis, JumpAnalysisStatus, MovementType
@@ -39,6 +40,7 @@ def _analyzer(pose_extractor) -> JumpVideoAnalyzer:
             MovementType.JUMP: build_jump_risk_profile(settings),
             MovementType.SQUAT: build_squat_risk_profile(settings),
         },
+        risk_details_serializer=RiskDetailsSerializer(),
         pose_model_version="pose-test-v1",
         risk_model_version="risk-test-v1",
     )
