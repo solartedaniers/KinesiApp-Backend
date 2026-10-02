@@ -16,8 +16,7 @@ class JumpAnalysisStatus(str, enum.Enum):
 
 
 class MovementType(str, enum.Enum):
-    """Qué gesto se grabó. Hoy sólo se guarda: el análisis es el mismo para ambos hasta
-    validar el spike con videos reales de sentadilla."""
+    """Qué gesto se grabó: define cómo se busca la repetición y qué patrones de riesgo aplican."""
 
     JUMP = "jump"
     SQUAT = "squat"
@@ -38,6 +37,11 @@ class JumpAnalysis(Base):
         Enum(JumpAnalysisStatus), default=JumpAnalysisStatus.PENDING, nullable=False
     )
     risk_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Patrón que determinó el risk_score; None si ninguno se disparó
+    dominant_risk_pattern: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Con qué modelo y qué reglas se calculó, para no reinterpretar resultados viejos
+    pose_model_version: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    risk_model_version: Mapped[str | None] = mapped_column(String(50), nullable=True)
     recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     athlete: Mapped["AthleteProfile"] = relationship(back_populates="jump_analyses")

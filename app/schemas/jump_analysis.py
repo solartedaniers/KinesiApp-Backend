@@ -18,6 +18,9 @@ class JumpAnalysisResultIngest(BaseModel):
 
     risk_score: float = Field(ge=0, le=1)
     measurements: list[JointAngleMeasurementCreate]
+    dominant_risk_pattern: str | None = Field(default=None, max_length=50)
+    pose_model_version: str | None = Field(default=None, max_length=100)
+    risk_model_version: str | None = Field(default=None, max_length=50)
 
 
 class JointAngleMeasurementRead(BaseModel):
@@ -38,6 +41,9 @@ class JumpAnalysisRead(BaseModel):
     movement_type: MovementType
     status: JumpAnalysisStatus
     risk_score: float | None
+    dominant_risk_pattern: str | None
+    pose_model_version: str | None
+    risk_model_version: str | None
     recorded_at: datetime
     angle_measurements: list[JointAngleMeasurementRead] = []
 
