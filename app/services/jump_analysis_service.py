@@ -103,6 +103,9 @@ class JumpAnalysisService:
     def apply_result(analysis: JumpAnalysis, result: JumpAnalysisResultIngest) -> None:
         # Compartido por el webhook y por el procesamiento en segundo plano
         analysis.risk_score = result.risk_score
+        analysis.dominant_risk_pattern = result.dominant_risk_pattern
+        analysis.pose_model_version = result.pose_model_version
+        analysis.risk_model_version = result.risk_model_version
         analysis.status = JumpAnalysisStatus.PROCESSED
         analysis.angle_measurements = [
             JointAngleMeasurement(**measurement.model_dump()) for measurement in result.measurements
