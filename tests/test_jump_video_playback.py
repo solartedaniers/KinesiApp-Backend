@@ -62,7 +62,7 @@ def test_movement_type_is_stored_and_defaults_to_jump(client, register_and_verif
     squat_id = r.json()["id"]
     assert r.json()["movement_type"] == "squat"
 
-    # Mismo procesamiento de demostración sin importar el tipo
+    # Con el analizador de prueba (conftest) ambos dan el mismo resultado
     squat = client.get(f"/api/v1/jump-analyses/{squat_id}", headers=_auth_headers(token)).json()
     processed_jump = client.get(f"/api/v1/jump-analyses/{jump['id']}", headers=_auth_headers(token)).json()
     assert (squat["movement_type"], squat["status"]) == ("squat", "processed")

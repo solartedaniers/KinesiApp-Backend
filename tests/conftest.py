@@ -29,6 +29,8 @@ from app.core.config import settings
 from app.core.database import Base, get_db, get_session_factory
 from app.main import app
 from app.models.user import User, UserRole
+from app.schemas.jump_analysis import JointAngleMeasurementCreate, JumpAnalysisResultIngest
+from app.services.jump_video_analyzer_factory import get_jump_video_analyzer
 
 engine = create_engine(
     "sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool
@@ -47,6 +49,23 @@ def _override_get_db():
 app.dependency_overrides[get_db] = _override_get_db
 # Las tareas en segundo plano abren su propia sesión: también contra la DB de tests
 app.dependency_overrides[get_session_factory] = lambda: TestingSessionLocal
+
+
+class _StubJumpVideoAnalyzer:
+    """Los tests de API suben bytes que no son un video: el análisis real se prueba aparte
+    (tests/test_analysis_*.py), aquí sólo importa el ciclo de vida del análisis."""
+
+    def analyze(self, video_path, movement_type):
+        return JumpAnalysisResultIngest(
+            risk_score=0.5,
+            dominant_risk_pattern="forward_collapse",
+            pose_model_version="pose-stub",
+            risk_model_version="risk-stub",
+            measurements=[JointAngleMeasurementCreate(joint_name="knee_flexion", angle_degrees=40, frame_timestamp_ms=0)],
+        )
+
+
+app.dependency_overrides[get_jump_video_analyzer] = _StubJumpVideoAnalyzer
 
 
 @pytest.fixture(autouse=True)
