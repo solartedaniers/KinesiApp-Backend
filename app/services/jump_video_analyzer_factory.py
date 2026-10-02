@@ -6,6 +6,7 @@ from app.analysis.pose_estimator import MediaPipePoseEstimator
 from app.analysis.pose_extraction import VideoPoseExtractor
 from app.analysis.preprocessing import LandmarkSeriesPreprocessor
 from app.analysis.risk import KneeFlexionRiskStrategy, LinearRamp, RiskScoreAggregator, TrunkFlexionRiskStrategy
+from app.analysis.risk_details import RiskDetailsSerializer
 from app.analysis.squat_phases import SquatBottomDetector
 from app.analysis.trunk_hinge import FallbackWindowDetector, TrunkHingeDetector
 from app.analysis.video_reader import VideoFrameReader
@@ -28,6 +29,7 @@ def build_jump_video_analyzer(config: Settings) -> JumpVideoAnalyzer:
             MovementType.JUMP: build_jump_risk_profile(config),
             MovementType.SQUAT: build_squat_risk_profile(config),
         },
+        risk_details_serializer=RiskDetailsSerializer(),
         pose_model_version=config.POSE_MODEL_VERSION,
         risk_model_version=config.RISK_MODEL_VERSION,
     )

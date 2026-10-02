@@ -104,6 +104,7 @@ class JumpAnalysisService:
         # Compartido por el webhook y por el procesamiento en segundo plano
         analysis.risk_score = result.risk_score
         analysis.dominant_risk_pattern = result.dominant_risk_pattern
+        analysis.risk_details = result.risk_details
         analysis.pose_model_version = result.pose_model_version
         analysis.risk_model_version = result.risk_model_version
         analysis.status = JumpAnalysisStatus.PROCESSED

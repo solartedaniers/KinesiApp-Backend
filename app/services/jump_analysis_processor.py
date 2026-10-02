@@ -12,6 +12,7 @@ from app.analysis.pose_extraction import VideoPoseExtractor
 from app.analysis.pose_series import PoseSeries
 from app.analysis.preprocessing import LandmarkSeriesPreprocessor
 from app.analysis.risk import RiskScoreAggregator
+from app.analysis.risk_details import RiskDetailsSerializer
 from app.models.jump_analysis import JumpAnalysisStatus, MovementType
 from app.repositories.jump_analysis_repository import JumpAnalysisRepository
 from app.schemas.jump_analysis import JointAngleMeasurementCreate, JumpAnalysisResultIngest
@@ -44,6 +45,7 @@ class JumpVideoAnalyzer:
         preprocessor: LandmarkSeriesPreprocessor,
         angle_calculator: AngleCalculator,
         profiles: dict[MovementType, MovementRiskProfile],
+        risk_details_serializer: RiskDetailsSerializer,
         pose_model_version: str,
         risk_model_version: str,
     ) -> None:
@@ -51,6 +53,7 @@ class JumpVideoAnalyzer:
         self._preprocessor = preprocessor
         self._angle_calculator = angle_calculator
         self._profiles = profiles
+        self._risk_details_serializer = risk_details_serializer
         self._pose_model_version = pose_model_version
         self._risk_model_version = risk_model_version
 
@@ -65,6 +68,7 @@ class JumpVideoAnalyzer:
         return JumpAnalysisResultIngest(
             risk_score=round(risk.risk_score, 3),
             dominant_risk_pattern=risk.dominant_pattern,
+            risk_details=self._risk_details_serializer.serialize(risk, series),
             pose_model_version=self._pose_model_version,
             risk_model_version=self._risk_model_version,
             measurements=self._measurements(series, angles),
