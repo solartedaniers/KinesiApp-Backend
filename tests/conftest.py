@@ -1,6 +1,5 @@
 """Fixtures compartidas: una sola DB SQLite en memoria, reseteada por test."""
 import os
-import tempfile
 
 # Config SMTP de prueba: no se conecta a internet; SmtpEmailSender queda reemplazado
 # por el fixture email_outbox antes de enviar correos.
@@ -10,8 +9,15 @@ os.environ.setdefault("SMTP_USER", "test@kinesiapp.test")
 os.environ.setdefault("SMTP_PASSWORD", "test-password")
 os.environ.setdefault("SMTP_FROM_NAME", "KinesiApp Test")
 os.environ.setdefault("OTP_EXPIRE_MINUTES", "10")
-# Videos subidos en tests: a un directorio temporal, nunca a backend/media
-os.environ.setdefault("VIDEO_UPLOAD_DIR", tempfile.mkdtemp(prefix="kinesiapp-videos-"))
+# Postgres ficticio: los tests usan SQLite en memoria y, al ganarle al .env, nunca tocan Neon
+os.environ.setdefault("POSTGRES_HOST", "postgres.test")
+os.environ.setdefault("POSTGRES_USER", "test")
+os.environ.setdefault("POSTGRES_PASSWORD", "test-password")
+os.environ.setdefault("POSTGRES_DB", "kinesiapp_test")
+# Sin credenciales de almacenamiento, aunque el .env tenga las de Neon: si un test olvidara el
+# fake, la subida respondería 503 en vez de escribir en el bucket real
+for _storage_variable in ("AWS_ENDPOINT_URL_S3", "AWS_REGION", "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"):
+    os.environ[_storage_variable] = ""
 SERVICE_API_KEY = "test-service-api-key"
 # Contenido del video de prueba: distinto byte a byte para verificar lo que se reproduce
 VIDEO_BYTES = bytes(range(256)) * 16
@@ -30,7 +36,11 @@ from app.core.database import Base, get_db, get_session_factory
 from app.main import app
 from app.models.user import User, UserRole
 from app.schemas.jump_analysis import JointAngleMeasurementCreate, JumpAnalysisResultIngest
+from app.services.chat_factory import get_llm_client
 from app.services.jump_video_analyzer_factory import get_jump_video_analyzer
+from app.services.jump_video_storage import JumpVideoStorage
+from app.services.object_storage_factory import get_video_object_storage
+from app.storage.object_storage import ObjectStorageError
 
 engine = create_engine(
     "sqlite:///:memory:", connect_args={"check_same_thread": False}, poolclass=StaticPool
@@ -66,6 +76,70 @@ class _StubJumpVideoAnalyzer:
 
 
 app.dependency_overrides[get_jump_video_analyzer] = _StubJumpVideoAnalyzer
+
+
+class FakeLlmClient:
+    """Sustituye a Gemini en los tests: nunca se llama a la API real."""
+
+    def __init__(self) -> None:
+        self.requests = []
+        self.reply = "Respuesta de prueba del asistente."
+        self.error: Exception | None = None
+
+    def generate_reply(self, request):
+        self.requests.append(request)
+        if self.error is not None:
+            raise self.error
+        return self.reply
+
+
+class FakeObjectStorage:
+    """Sustituye al almacenamiento de Neon en los tests: los objetos viven en memoria, sin red."""
+
+    PUBLIC_BASE_URL = "https://storage.test/videos/"
+
+    def __init__(self) -> None:
+        self.objects: dict[str, tuple[bytes, str]] = {}
+        self.error: Exception | None = None
+
+    def upload(self, source, key, content_type):
+        if self.error is not None:
+            raise self.error
+        url = self.PUBLIC_BASE_URL + key
+        self.objects[url] = (source.read(), content_type)
+        return url
+
+    def download(self, public_url, destination):
+        if public_url not in self.objects:
+            raise ObjectStorageError(f"No object at {public_url}")
+        destination.write_bytes(self.objects[public_url][0])
+
+    def delete(self, public_url):
+        if self.error is not None:
+            raise self.error
+        self.objects.pop(public_url, None)
+
+
+@pytest.fixture(autouse=True)
+def fake_object_storage():
+    # autouse: casi todos los tests de API suben un video
+    fake = FakeObjectStorage()
+    app.dependency_overrides[get_video_object_storage] = lambda: fake
+    yield fake
+    del app.dependency_overrides[get_video_object_storage]
+
+
+@pytest.fixture
+def jump_video_storage(fake_object_storage):
+    return JumpVideoStorage(fake_object_storage, settings.MAX_VIDEO_UPLOAD_BYTES)
+
+
+@pytest.fixture
+def fake_llm():
+    fake = FakeLlmClient()
+    app.dependency_overrides[get_llm_client] = lambda: fake
+    yield fake
+    del app.dependency_overrides[get_llm_client]
 
 
 @pytest.fixture(autouse=True)
