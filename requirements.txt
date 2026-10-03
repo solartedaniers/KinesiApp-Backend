@@ -24,3 +24,8 @@ httpx==0.28.1
 boto3==1.43.108
 # app/storage/neon_object_storage.py lo importa directo (Config y errores): no depender de que llegue transitivo
 botocore==1.43.108
+# Correo transaccional (app/mail/resend_email_sender.py)
+resend==2.49.1
+# Verificación DNS/MX del dominio del correo (app/services/email_domain_checker.py): se importan directo
+email-validator==2.3.0
+dnspython==2.8.0
