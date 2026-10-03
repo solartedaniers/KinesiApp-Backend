@@ -1,6 +1,7 @@
 """risk_details: el desglose del riesgo que se persiste para que el chat explique el resultado."""
 import json
 import math
+from io import BytesIO
 from pathlib import Path
 
 from app.analysis.movement_windows import DetectionMethod, MovementWindow
@@ -91,14 +92,16 @@ def test_trunk_hinge_fallback_is_recorded_as_the_detection_method():
     assert hinge["signals"]["squat_trunk_lean"]["measured_deg"]["median"] >= settings.RISK_SQUAT_TRUNK_LEAN_SATURATION_DEG
 
 
-def test_processor_persists_risk_details(db_session):
+def test_processor_persists_risk_details(db_session, fake_object_storage, jump_video_storage):
     points = standing_points(90)
     add_jump(points, takeoff=30, landing=45, height=0.15)
-    analysis = JumpAnalysis(athlete_id=1, video_reference="jump.mp4", movement_type=MovementType.JUMP)
+    video_url = fake_object_storage.upload(BytesIO(b"video"), "jump.mp4", "video/mp4")
+    analysis = JumpAnalysis(athlete_id=1, video_reference=video_url, movement_type=MovementType.JUMP)
     db_session.add(analysis)
     db_session.commit()
 
-    JumpAnalysisProcessor(TestingSessionLocal, _analyzer(_FixedPoseExtractor(pose_series(points)))).process(analysis.id)
+    analyzer = _analyzer(_FixedPoseExtractor(pose_series(points)))
+    JumpAnalysisProcessor(TestingSessionLocal, analyzer, jump_video_storage).process(analysis.id)
 
     db_session.refresh(analysis)
     assert analysis.status == JumpAnalysisStatus.PROCESSED

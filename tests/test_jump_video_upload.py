@@ -2,11 +2,15 @@
 from pydantic import SecretStr
 
 from app.core.config import settings
-from tests.conftest import SERVICE_API_KEY
+from app.models.jump_analysis import JumpAnalysis
+from app.storage.object_storage import ObjectStorageError
+from tests.conftest import SERVICE_API_KEY, VIDEO_BYTES
 from tests.test_jump_analysis_rbac import _auth_headers, _create_athlete_profile
 
 
-def test_upload_answers_pending_and_processes_in_background(client, register_and_verify, grant_consent, upload_jump):
+def test_upload_answers_pending_and_processes_in_background(
+    client, register_and_verify, grant_consent, upload_jump, db_session, fake_object_storage
+):
     token = register_and_verify("uploader@kinesiapp.com")
     athlete_id = _create_athlete_profile(client, token)
     grant_consent(token)
@@ -15,8 +19,11 @@ def test_upload_answers_pending_and_processes_in_background(client, register_and
     assert r.status_code == 202, r.text
     # La respuesta sale antes del procesamiento: todavía PENDING
     assert r.json()["status"] == "pending"
-    # La ruta de disco del servidor no sale en la respuesta
+    # La URL del video no sale en la respuesta: sólo se entrega por video-access
     assert "video_reference" not in r.json()
+    # Se guarda la URL pública del objeto, con el contenido y el tipo del video subido
+    video_url = db_session.get(JumpAnalysis, r.json()["id"]).video_reference
+    assert fake_object_storage.objects[video_url] == (VIDEO_BYTES, "video/mp4")
 
     # TestClient ejecuta las BackgroundTasks antes de devolver el control
     r = client.get(f"/api/v1/jump-analyses/{r.json()['id']}", headers=_auth_headers(token))
@@ -25,7 +32,9 @@ def test_upload_answers_pending_and_processes_in_background(client, register_and
     assert r.json()["angle_measurements"]
 
 
-def test_upload_rejects_non_video_and_oversized_files(client, register_and_verify, monkeypatch, grant_consent, upload_jump):
+def test_upload_rejects_non_video_and_oversized_files(
+    client, register_and_verify, monkeypatch, grant_consent, upload_jump, fake_object_storage
+):
     token = register_and_verify("uploader2@kinesiapp.com")
     athlete_id = _create_athlete_profile(client, token)
     grant_consent(token)
@@ -33,12 +42,25 @@ def test_upload_rejects_non_video_and_oversized_files(client, register_and_verif
     r = upload_jump(token, athlete_id, content_type="image/png")
     assert (r.status_code, r.json()["code"]) == (415, "invalid_video")
 
-    stored_before = set(settings.VIDEO_UPLOAD_DIR.glob("*"))
     monkeypatch.setattr(settings, "MAX_VIDEO_UPLOAD_BYTES", 1024)
     r = upload_jump(token, athlete_id)
     assert (r.status_code, r.json()["code"]) == (413, "video_too_large")
-    # El archivo a medio escribir se borra
-    assert set(settings.VIDEO_UPLOAD_DIR.glob("*")) == stored_before
+    # Ninguno de los dos llega al bucket
+    assert fake_object_storage.objects == {}
+
+
+def test_upload_answers_503_when_the_storage_fails(
+    client, register_and_verify, grant_consent, upload_jump, fake_object_storage, db_session
+):
+    token = register_and_verify("uploader3@kinesiapp.com")
+    athlete_id = _create_athlete_profile(client, token)
+    grant_consent(token)
+    fake_object_storage.error = ObjectStorageError("storage down")
+
+    r = upload_jump(token, athlete_id)
+    assert (r.status_code, r.json()["code"]) == (503, "storage_unavailable")
+    # Sin video no se crea el análisis
+    assert db_session.query(JumpAnalysis).count() == 0
 
 
 def test_other_athlete_cannot_upload(client, register_and_verify, grant_consent, upload_jump):

@@ -1,4 +1,5 @@
 """JumpVideoAnalyzer de punta a punta con un extractor falso (sin MediaPipe ni video real)."""
+from io import BytesIO
 from pathlib import Path
 
 import pytest
@@ -88,13 +89,14 @@ def test_unreadable_file_fails_before_loading_the_pose_model(tmp_path):
         analyzer.analyze(not_a_video, MovementType.JUMP)
 
 
-def test_processor_marks_failed_when_the_movement_is_not_found(db_session):
-    analysis = JumpAnalysis(athlete_id=1, video_reference="still.mp4", movement_type=MovementType.SQUAT)
+def test_processor_marks_failed_when_the_movement_is_not_found(db_session, fake_object_storage, jump_video_storage):
+    video_url = fake_object_storage.upload(BytesIO(b"video"), "still.mp4", "video/mp4")
+    analysis = JumpAnalysis(athlete_id=1, video_reference=video_url, movement_type=MovementType.SQUAT)
     db_session.add(analysis)
     db_session.commit()
     analyzer = _analyzer(_FixedPoseExtractor(pose_series(standing_points(90))))
 
-    JumpAnalysisProcessor(TestingSessionLocal, analyzer).process(analysis.id)
+    JumpAnalysisProcessor(TestingSessionLocal, analyzer, jump_video_storage).process(analysis.id)
 
     db_session.refresh(analysis)
     assert analysis.status == JumpAnalysisStatus.FAILED
