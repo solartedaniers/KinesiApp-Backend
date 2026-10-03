@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.user import UserRole
 from app.schemas.password_policy import StrongPassword
+from app.schemas.person_name import PersonName
 
 # Roles elegibles en el alta pública: ADMIN queda fuera, solo otro admin lo asigna
 PublicSignupRole = Literal[UserRole.ATHLETE, UserRole.COACH]
@@ -13,12 +14,13 @@ PublicSignupRole = Literal[UserRole.ATHLETE, UserRole.COACH]
 class UserCreate(BaseModel):
     email: EmailStr
     password: StrongPassword
-    full_name: str = Field(min_length=1, max_length=150)
+    full_name: PersonName
     role: PublicSignupRole = UserRole.ATHLETE
 
 
 class UserProfileUpdate(BaseModel):
-    full_name: str = Field(min_length=1, max_length=150)
+    # La misma regla que en el registro: si no, se podría saltar editando el perfil
+    full_name: PersonName
 
 
 class UserRoleUpdate(BaseModel):
