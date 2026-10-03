@@ -15,6 +15,8 @@ class ErrorCode(str, enum.Enum):
     EMAIL_ALREADY_REGISTERED = "email_already_registered"
     PROFILE_ALREADY_EXISTS = "profile_already_exists"
     INVALID_CREDENTIALS = "invalid_credentials"
+    EMAIL_NOT_REGISTERED = "email_not_registered"
+    EMAIL_DOMAIN_UNDELIVERABLE = "email_domain_undeliverable"
     ACCOUNT_DISABLED = "account_disabled"
     EMAIL_NOT_VERIFIED = "email_not_verified"
     INVALID_OTP = "invalid_otp"
