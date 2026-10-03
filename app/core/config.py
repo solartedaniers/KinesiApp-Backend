@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=Path(__file__).resolve().parents[3] / ".env",
         env_file_encoding="utf-8",
-        # Tolera variables obsoletas en .env (p. ej. el antiguo SMTP_FROM)
+        # Tolera variables obsoletas en .env (p. ej. las SMTP_* de antes de Resend)
         extra="ignore",
     )
 
@@ -37,16 +37,20 @@ class Settings(BaseSettings):
     OTP_EXPIRE_MINUTES: int = Field(gt=0)
     OTP_MAX_ATTEMPTS: int = Field(default=5, gt=0)
 
-    # Gmail usa smtp.gmail.com:587 con STARTTLS y contraseña de aplicación.
-    SMTP_HOST: str = Field(min_length=1)
-    SMTP_PORT: int = Field(gt=0, le=65535)
-    SMTP_USER: str = Field(min_length=1)
-    SMTP_PASSWORD: SecretStr = Field(min_length=1)
-    # Solo el nombre visible: la dirección remitente siempre es SMTP_USER (requisito de Gmail).
-    SMTP_FROM_NAME: str = "KinesiApp"
-    SMTP_USE_TLS: bool = True
-    SMTP_USE_SSL: bool = False
-    SMTP_TIMEOUT_SECONDS: int = Field(default=15, gt=0, le=120)
+    # Política de contraseñas nuevas (app/schemas/password_policy.py). El frontend la replica en
+    # lib/validation.ts: cambiarla aquí exige cambiarla allí
+    PASSWORD_MIN_LENGTH: int = Field(default=8, ge=8)
+    PASSWORD_MAX_LENGTH: int = Field(default=128, gt=0)
+
+    # Verificación DNS/MX del dominio del correo en el registro (app/services/email_domain_checker.py)
+    EMAIL_DNS_TIMEOUT_SECONDS: int = Field(default=5, gt=0)
+
+    # Correo transaccional con Resend. Sin RESEND_API_KEY el envío falla con un error explícito
+    # (503 email_delivery_failed). onboarding@resend.dev sólo entrega al dueño de la cuenta de
+    # Resend: para usuarios reales hay que verificar un dominio. Admite "Nombre <correo>"
+    RESEND_API_KEY: SecretStr | None = None
+    RESEND_FROM_EMAIL: str = Field(default="onboarding@resend.dev", min_length=1)
+    RESEND_TIMEOUT_SECONDS: int = Field(default=15, gt=0, le=120)
 
     MAX_VIDEO_UPLOAD_BYTES: int = Field(default=100 * 1024 * 1024, gt=0)
 
