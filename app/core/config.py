@@ -21,13 +21,13 @@ class Settings(BaseSettings):
     CORS_ALLOWED_ORIGINS: list[str] = Field(default_factory=list)
     CORS_ALLOW_ORIGIN_REGEX: str | None = r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 
-    POSTGRES_USER: str = "kinesiapp"
-    POSTGRES_PASSWORD: str = "kinesiapp"
-    POSTGRES_HOST: str = "localhost"
-    # En desarrollo local de Windows, docker-compose publica PostgreSQL aquí.
-    # El servicio API de Docker sobrescribe el puerto a 5432.
-    POSTGRES_PORT: int = 5434
-    POSTGRES_DB: str = "kinesiapp"
+    # Neon, sin valores por defecto: si faltan, la app falla al arrancar en vez de buscar un
+    # Postgres local que ya no existe. Local: endpoint directo; Cloud Run: el "-pooler"
+    POSTGRES_USER: str = Field(min_length=1)
+    POSTGRES_PASSWORD: SecretStr = Field(min_length=1)
+    POSTGRES_HOST: str = Field(min_length=1)
+    POSTGRES_PORT: int = Field(default=5432, gt=0, le=65535)
+    POSTGRES_DB: str = Field(min_length=1)
 
     # JWT: access de vida corta para uso normal, refresh de vida larga solo para renovarlo
     JWT_SECRET_KEY: str = "change-me-in-production"
@@ -48,9 +48,17 @@ class Settings(BaseSettings):
     SMTP_USE_SSL: bool = False
     SMTP_TIMEOUT_SECONDS: int = Field(default=15, gt=0, le=120)
 
-    # Videos de salto: se guardan en disco (backend/media/jump_videos) hasta que se procesan
-    VIDEO_UPLOAD_DIR: Path = Path(__file__).resolve().parents[2] / "media" / "jump_videos"
     MAX_VIDEO_UPLOAD_BYTES: int = Field(default=100 * 1024 * 1024, gt=0)
+
+    # Almacenamiento de objetos compatible con S3 de Neon (app/storage). Mismos nombres que usa
+    # boto3. Sin credenciales, subir un video responde 503 storage_unavailable
+    AWS_ENDPOINT_URL_S3: str | None = None
+    AWS_REGION: str | None = None
+    AWS_ACCESS_KEY_ID: str | None = None
+    AWS_SECRET_ACCESS_KEY: SecretStr | None = None
+    # Buckets con lectura pública: la URL del objeto es la que se guarda en la base
+    S3_VIDEOS_BUCKET: str = Field(default="videos", min_length=1)
+    S3_IMAGES_BUCKET: str = Field(default="images", min_length=1)
 
     # Análisis de pose (docs/design/video-analysis-pipeline.md §5). La versión se guarda en cada
     # análisis: cambiar de modelo exige cambiarla también
@@ -101,6 +109,23 @@ class Settings(BaseSettings):
         "hip_hinge_squat": ["squat_trunk_lean", "squat_knee_shallow"],
     }
 
+    # Corte de nivel de riesgo (mismos valores que RISK_THRESHOLDS del frontend): el chat recomienda
+    # consulta profesional con nivel "high" (docs/design/video-analysis-pipeline.md §6.3)
+    RISK_LEVEL_MODERATE: float = Field(default=0.33, ge=0, le=1)
+    RISK_LEVEL_HIGH: float = Field(default=0.66, ge=0, le=1)
+
+    # Chat con Gemini (§6). Sin GEMINI_API_KEY el chat responde 503 assistant_unavailable
+    GEMINI_API_KEY: SecretStr | None = None
+    GEMINI_MODEL: str = "gemini-3.8-flash"
+    GEMINI_TIMEOUT_SECONDS: float = Field(default=30.0, gt=0)
+    GEMINI_MAX_OUTPUT_TOKENS: int = Field(default=1024, gt=0)
+    CHAT_MESSAGE_MAX_CHARS: int = Field(default=1000, gt=0)
+    CHAT_HISTORY_MAX_MESSAGES: int = Field(default=10, ge=0)
+    CHAT_PROMPT_MAX_REPETITIONS: int = Field(default=5, ge=0)
+    CHAT_RATE_LIMIT_PER_USER_PER_HOUR: int = Field(default=20, gt=0)
+    # Por debajo del límite de requests por minuto del free tier del modelo (§6.7)
+    CHAT_RATE_LIMIT_GLOBAL_PER_MINUTE: int = Field(default=8, gt=0)
+
     # Clave del proceso interno que reporta resultados a POST /jump-analyses/{id}/results.
     # Sin definir, ese endpoint rechaza toda llamada (cerrado por defecto)
     JUMP_ANALYSIS_SERVICE_API_KEY: SecretStr | None = None
@@ -116,7 +141,7 @@ class Settings(BaseSettings):
         return URL.create(
             drivername="postgresql+psycopg2",
             username=self.POSTGRES_USER,
-            password=self.POSTGRES_PASSWORD,
+            password=self.POSTGRES_PASSWORD.get_secret_value(),
             host=self.POSTGRES_HOST,
             port=self.POSTGRES_PORT,
             database=self.POSTGRES_DB,

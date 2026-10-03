@@ -6,7 +6,7 @@ sqlalchemy==2.0.36
 psycopg2-binary==2.9.10
 alembic==1.14.0
 pydantic-settings==2.7.1
-pydantic[email]==2.10.4
+pydantic[email]>=2.12.5,<3.0.0
 passlib==1.7.4
 bcrypt==4.0.1
 PyJWT==2.10.1
@@ -16,3 +16,11 @@ mediapipe==1.0.1
 opencv-contrib-python==5.0.0.93
 numpy==2.5.3
 scipy==1.18.1
+# Chat con Gemini (app/chat)
+google-genai==2.27.0
+# app/chat/gemini_client.py lo importa directo (errores de red/timeout): no depender de que llegue transitivo
+httpx==0.28.1
+# Almacenamiento de objetos S3 de Neon (app/storage)
+boto3==1.43.108
+# app/storage/neon_object_storage.py lo importa directo (Config y errores): no depender de que llegue transitivo
+botocore==1.43.108

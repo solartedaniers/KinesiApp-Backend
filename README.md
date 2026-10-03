@@ -13,10 +13,12 @@ pip install -r requirements-dev.txt
 # 0. Download the pose model (the Docker image does this at build time, pinned by checksum)
 curl -L -o models/pose_landmarker_full.task   https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task
 
-# 1. Start Postgres (see docker-compose.yml at the repo root)
-docker compose up -d db
+# 1. Point the root .env at Neon (no local Postgres anymore): POSTGRES_HOST/PORT/USER/PASSWORD/DB
+#    from Neon's DIRECT connection string (host without "-pooler"), see .env.example.
+#    libpq reads PGSSLMODE from the process environment, not from .env:
+export PGSSLMODE=require          # PowerShell: $env:PGSSLMODE="require"
 
-# 2. Migrate the schema
+# 2. Migrate the schema (this runs against Neon: it is the real database)
 alembic upgrade head
 
 # 3. Create the first admin
@@ -56,7 +58,8 @@ alembic check
 ```
 
 `scripts/check_migrations.py` runs `alembic upgrade head` + `alembic check` in one shot against
-whatever Postgres `Settings` points to — useful to confirm a fresh/CI database ends up drift-free:
+whatever Postgres `Settings` points to — with the .env on Neon that means it **applies pending
+migrations to Neon**. Useful to confirm a fresh/CI database (e.g. a Neon branch) ends up drift-free:
 
 ```bash
 python scripts/check_migrations.py
@@ -81,6 +84,9 @@ never live in the repo.
 ```bash
 pytest
 ```
+
+Tests never touch Neon: they run on in-memory SQLite, and `tests/conftest.py` sets dummy
+`POSTGRES_*` env vars that take precedence over the `.env`.
 
 `tests/test_analysis_real_videos.py` runs MediaPipe on the spike videos
 (`spikes/pose_spike/videos/`, not versioned) and is skipped when they or the model are missing.

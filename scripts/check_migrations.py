@@ -3,7 +3,7 @@ configurada en Settings, para confirmar que las migraciones aplican limpio y
 que no quedó drift entre los modelos y la última migración.
 
 No usa SQLite: apunta a la misma base que usaría la app (ver app/core/config.py),
-así que antes hay que levantar Postgres (ver README.md).
+que hoy es Neon: aplica las migraciones pendientes ahí (ver backend/README.md).
 
 Uso: python scripts/check_migrations.py
 """

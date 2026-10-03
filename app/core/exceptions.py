@@ -27,7 +27,10 @@ class ErrorCode(str, enum.Enum):
     VIDEO_TOO_LARGE = "video_too_large"
     INVALID_SERVICE_API_KEY = "invalid_service_api_key"
     CONSENT_REQUIRED = "consent_required"
-    VIDEO_NOT_FOUND = "video_not_found"
+    ANALYSIS_NOT_PROCESSED = "analysis_not_processed"
+    CHAT_RATE_LIMITED = "chat_rate_limited"
+    ASSISTANT_UNAVAILABLE = "assistant_unavailable"
+    STORAGE_UNAVAILABLE = "storage_unavailable"
 
 
 class AppException(Exception):
@@ -85,6 +88,13 @@ class ServiceUnavailableException(AppException):
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             code=code,
         )
+
+
+class TooManyRequestsException(AppException):
+    """Se superó un límite de uso; el cliente puede reintentar más tarde."""
+
+    def __init__(self, detail: str, code: ErrorCode) -> None:
+        super().__init__(detail=detail, status_code=status.HTTP_429_TOO_MANY_REQUESTS, code=code)
 
 
 async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
