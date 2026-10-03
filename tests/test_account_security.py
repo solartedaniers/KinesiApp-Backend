@@ -19,12 +19,45 @@ def _request_reset_code(client, email_outbox, email: str) -> str:
     return re.search(r"\b\d{6}\b", message["body"]).group()
 
 
-def test_register_rejects_password_without_digit(client):
+def test_register_requires_every_password_character_class(client, email_outbox):
+    for weak, missing in [
+        ("onlyletters", "one uppercase letter, one digit, one special character"),
+        ("NOLOWER1!", "one lowercase letter"),
+        ("NoDigits!", "one digit"),
+        ("NoSpecial1", "one special character"),
+        ("Sh0rt!", None),  # demasiado corta
+    ]:
+        r = client.post(
+            "/api/v1/auth/register",
+            json={"email": "weak@kinesiapp.com", "password": weak, "full_name": "Weak"},
+        )
+        assert r.status_code == 422, weak
+        if missing:
+            assert f"at least {missing}" in r.text
+    # Tildes y ñ cuentan como letras y el guion bajo como especial; el espacio se permite pero no cuenta
+    for strong in ("Ñandú2024!", "Clave segura 1!", "Clave_segura1"):
+        r = client.post(
+            "/api/v1/auth/register",
+            json={"email": "strong@kinesiapp.com", "password": strong, "full_name": "Strong"},
+        )
+        assert r.status_code == 201, (strong, r.text)
+
+
+def test_full_name_accepts_only_letters_and_spaces(client, email_outbox):
+    for invalid in ("Ana3", "Ana_Pérez", "R2-D2", "Ana!", "   ", "Luis ²"):
+        r = client.post(
+            "/api/v1/auth/register",
+            json={"email": "name@kinesiapp.com", "password": "Supersecret1!", "full_name": invalid},
+        )
+        assert r.status_code == 422, invalid
+    # Tildes, ñ y diéresis (también en forma descompuesta, como la mandan algunos teclados);
+    # los espacios sobrantes se colapsan
     r = client.post(
         "/api/v1/auth/register",
-        json={"email": "weak@kinesiapp.com", "password": "onlyletters", "full_name": "Weak"},
+        json={"email": "name@kinesiapp.com", "password": "Supersecret1!", "full_name": "  Mari\u0301a   Ñúñez  Güell "},
     )
-    assert r.status_code == 422
+    assert r.status_code == 201, r.text
+    assert r.json()["full_name"] == "María Ñúñez Güell"
 
 
 def test_recovery_verify_step_does_not_consume_code(client, register_and_verify, email_outbox):
@@ -39,7 +72,7 @@ def test_recovery_verify_step_does_not_consume_code(client, register_and_verify,
 
     r = client.post(
         "/api/v1/auth/password-recovery/confirm",
-        json={"email": "steps@kinesiapp.com", "code": code, "new_password": "brandnew123"},
+        json={"email": "steps@kinesiapp.com", "code": code, "new_password": "BrandNew123!"},
     )
     assert r.status_code == 204
 
@@ -55,7 +88,7 @@ def test_recovery_rejects_current_password(client, register_and_verify, email_ou
     code = _request_reset_code(client, email_outbox, "reuse@kinesiapp.com")
     r = client.post(
         "/api/v1/auth/password-recovery/confirm",
-        json={"email": "reuse@kinesiapp.com", "code": code, "new_password": "supersecret1"},
+        json={"email": "reuse@kinesiapp.com", "code": code, "new_password": "Supersecret1!"},
     )
     assert r.status_code == 409
     assert r.json()["code"] == "password_reused"
@@ -66,7 +99,7 @@ def test_change_password_flow(client, register_and_verify, db_session):
 
     r = client.post(
         "/api/v1/auth/password/change",
-        json={"current_password": "wrongpass1", "new_password": "another123"},
+        json={"current_password": "wrongpass1", "new_password": "Another123!"},
         headers=_auth(token),
     )
     assert r.status_code == 400
@@ -74,27 +107,28 @@ def test_change_password_flow(client, register_and_verify, db_session):
 
     r = client.post(
         "/api/v1/auth/password/change",
-        json={"current_password": "supersecret1", "new_password": "supersecret1"},
+        json={"current_password": "Supersecret1!", "new_password": "Supersecret1!"},
         headers=_auth(token),
     )
     assert r.json()["code"] == "password_reused"
 
     r = client.post(
         "/api/v1/auth/password/change",
-        json={"current_password": "supersecret1", "new_password": "another123"},
+        json={"current_password": "Supersecret1!", "new_password": "Another123!"},
         headers=_auth(token),
     )
     assert r.status_code == 200
     assert r.json()["refresh_token"]
 
     stored = db_session.query(User).filter(User.email == "change@kinesiapp.com").one()
-    assert stored.hashed_password.startswith("$2") and "another123" not in stored.hashed_password
-    assert client.post("/api/v1/auth/login", json={"email": "change@kinesiapp.com", "password": "another123"}).status_code == 200
+    assert stored.hashed_password.startswith("$2") and "Another123!" not in stored.hashed_password
+    assert client.post("/api/v1/auth/login", json={"email": "change@kinesiapp.com", "password": "Another123!"}).status_code == 200
 
 
 def test_update_profile_and_avatar(client, register_and_verify):
     token = register_and_verify("me@kinesiapp.com")
 
+    assert client.patch("/api/v1/users/me", json={"full_name": "Nombre 2"}, headers=_auth(token)).status_code == 422
     r = client.patch("/api/v1/users/me", json={"full_name": "Nuevo Nombre"}, headers=_auth(token))
     assert r.status_code == 200
     assert r.json()["full_name"] == "Nuevo Nombre"

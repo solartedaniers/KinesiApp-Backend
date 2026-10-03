@@ -6,7 +6,7 @@ from tests.conftest import TestingSessionLocal, engine
 
 def _run_create_admin(monkeypatch, email: str) -> None:
     monkeypatch.setenv("ADMIN_EMAIL", email)
-    monkeypatch.setenv("ADMIN_PASSWORD", "supersecret1")
+    monkeypatch.setenv("ADMIN_PASSWORD", "Supersecret1!")
     monkeypatch.setenv("ADMIN_FULL_NAME", "Admin User")
     # La CLI usa su propia sesión (no pasa por get_db); se redirige a la DB de test
     monkeypatch.setattr("app.cli.SessionLocal", TestingSessionLocal)

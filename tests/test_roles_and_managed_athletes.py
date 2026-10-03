@@ -16,7 +16,7 @@ def test_register_as_coach_keeps_role_after_verification(client, register_and_ve
 def test_register_without_role_defaults_to_athlete(client, register_and_verify, email_outbox):
     r = client.post(
         "/api/v1/auth/register",
-        json={"email": "legacy@kinesiapp.com", "password": "supersecret1", "full_name": "Legacy"},
+        json={"email": "legacy@kinesiapp.com", "password": "Supersecret1!", "full_name": "Legacy"},
     )
     assert r.status_code == 201
     assert r.json()["role"] == "athlete"
@@ -25,7 +25,7 @@ def test_register_without_role_defaults_to_athlete(client, register_and_verify, 
 def test_register_rejects_admin_role(client):
     r = client.post(
         "/api/v1/auth/register",
-        json={"email": "evil@kinesiapp.com", "password": "supersecret1", "full_name": "Evil", "role": "admin"},
+        json={"email": "evil@kinesiapp.com", "password": "Supersecret1!", "full_name": "Evil", "role": "admin"},
     )
     assert r.status_code == 422
 

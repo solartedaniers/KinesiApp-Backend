@@ -1,13 +1,9 @@
 """Fixtures compartidas: una sola DB SQLite en memoria, reseteada por test."""
 import os
 
-# Config SMTP de prueba: no se conecta a internet; SmtpEmailSender queda reemplazado
-# por el fixture email_outbox antes de enviar correos.
-os.environ.setdefault("SMTP_HOST", "smtp.test")
-os.environ.setdefault("SMTP_PORT", "587")
-os.environ.setdefault("SMTP_USER", "test@kinesiapp.test")
-os.environ.setdefault("SMTP_PASSWORD", "test-password")
-os.environ.setdefault("SMTP_FROM_NAME", "KinesiApp Test")
+# Sin API key de Resend, aunque el .env la tenga: si un test olvidara email_outbox, el envío
+# fallaría con UnconfiguredEmailSender en vez de llamar a Resend
+os.environ["RESEND_API_KEY"] = ""
 os.environ.setdefault("OTP_EXPIRE_MINUTES", "10")
 # Postgres ficticio: los tests usan SQLite en memoria y, al ganarle al .env, nunca tocan Neon
 os.environ.setdefault("POSTGRES_HOST", "postgres.test")
@@ -37,6 +33,8 @@ from app.main import app
 from app.models.user import User, UserRole
 from app.schemas.jump_analysis import JointAngleMeasurementCreate, JumpAnalysisResultIngest
 from app.services.chat_factory import get_llm_client
+from app.services.email_domain_checker import get_email_domain_checker
+from app.services.email_factory import get_email_sender
 from app.services.jump_video_analyzer_factory import get_jump_video_analyzer
 from app.services.jump_video_storage import JumpVideoStorage
 from app.services.object_storage_factory import get_video_object_storage
@@ -155,14 +153,48 @@ def client():
 
 
 @pytest.fixture
-def email_outbox(monkeypatch):
-    messages = []
+def email_outbox(fake_email_sender):
+    return fake_email_sender.messages
 
-    def capture_email(sender, recipient, subject, body):
-        messages.append({"to": recipient, "subject": subject, "body": body})
 
-    monkeypatch.setattr("app.core.email.SmtpEmailSender.send", capture_email)
-    return messages
+class FakeEmailSender:
+    """Sustituye a Resend en los tests: guarda los correos en memoria, nunca hace HTTP."""
+
+    def __init__(self) -> None:
+        self.messages: list[dict[str, str]] = []
+        self.error: Exception | None = None
+
+    def send(self, recipient, subject, body):
+        if self.error is not None:
+            raise self.error
+        self.messages.append({"to": recipient, "subject": subject, "body": body})
+
+
+@pytest.fixture
+def fake_email_sender():
+    fake = FakeEmailSender()
+    app.dependency_overrides[get_email_sender] = lambda: fake
+    yield fake
+    del app.dependency_overrides[get_email_sender]
+
+
+class FakeEmailDomainChecker:
+    """Sustituye a la consulta DNS real: todo dominio es válido salvo los marcados como inexistentes."""
+
+    def __init__(self) -> None:
+        self.undeliverable_domains: set[str] = set()
+
+    def is_deliverable(self, email):
+        return email.rsplit("@", 1)[1].lower() not in self.undeliverable_domains
+
+
+@pytest.fixture(autouse=True)
+def fake_email_domain_checker():
+    # autouse: los tests registran usuarios con dominios inventados y no deben consultar DNS
+    fake = FakeEmailDomainChecker()
+    app.dependency_overrides[get_email_domain_checker] = lambda: fake
+    yield fake
+    del app.dependency_overrides[get_email_domain_checker]
 
 
 @pytest.fixture
@@ -177,11 +209,11 @@ def db_session():
 
 @pytest.fixture
 def register_and_verify(client, db_session, email_outbox):
-    """Factory fixture: registra un usuario, lee su OTP de la DB (no hay SMTP en tests),
+    """Factory fixture: registra un usuario, lee su OTP de la DB (no se envían correos reales en tests),
     lo verifica y devuelve el access token. Compartida por todos los tests que necesitan
     un usuario autenticado sin repetir el flujo completo de /auth en cada archivo."""
 
-    def _do(email: str, password: str = "supersecret1", role: str = "athlete") -> str:
+    def _do(email: str, password: str = "Supersecret1!", role: str = "athlete") -> str:
         r = client.post(
             "/api/v1/auth/register",
             json={"email": email, "password": password, "full_name": "Test User", "role": role},

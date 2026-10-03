@@ -19,13 +19,13 @@ def test_register_verify_login_refresh_and_password_recovery(
 
     r = client.post(
         "/api/v1/auth/register",
-        json={"email": email, "password": "supersecret1", "full_name": "Atleta Uno"},
+        json={"email": email, "password": "Supersecret1!", "full_name": "Atleta Uno"},
     )
     assert r.status_code == 201, r.text
     assert r.json()["is_verified"] is False
 
     # Login antes de verificar el email debe rechazarse
-    r = client.post("/api/v1/auth/login", json={"email": email, "password": "supersecret1"})
+    r = client.post("/api/v1/auth/login", json={"email": email, "password": "Supersecret1!"})
     assert r.status_code == 403
 
     # Código incorrecto debe rechazarse
@@ -48,7 +48,7 @@ def test_register_verify_login_refresh_and_password_recovery(
     assert r.json()["email"] == email
 
     # Ya verificado, login normal debe funcionar
-    r = client.post("/api/v1/auth/login", json={"email": email, "password": "supersecret1"})
+    r = client.post("/api/v1/auth/login", json={"email": email, "password": "Supersecret1!"})
     assert r.status_code == 200, r.text
     login_tokens = r.json()
 
@@ -81,12 +81,12 @@ def test_register_verify_login_refresh_and_password_recovery(
     reset_code = _read_code(email_outbox, email, "Recuperación")
     r = client.post(
         "/api/v1/auth/password-recovery/confirm",
-        json={"email": email, "code": reset_code, "new_password": "unanuevaclave1"},
+        json={"email": email, "code": reset_code, "new_password": "UnaNuevaClave1!"},
     )
     assert r.status_code == 204, r.text
 
-    r = client.post("/api/v1/auth/login", json={"email": email, "password": "supersecret1"})
+    r = client.post("/api/v1/auth/login", json={"email": email, "password": "Supersecret1!"})
     assert r.status_code == 401, "la contraseña vieja ya no debe funcionar"
 
-    r = client.post("/api/v1/auth/login", json={"email": email, "password": "unanuevaclave1"})
+    r = client.post("/api/v1/auth/login", json={"email": email, "password": "UnaNuevaClave1!"})
     assert r.status_code == 200, r.text
