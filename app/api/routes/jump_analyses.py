@@ -1,7 +1,5 @@
-import mimetypes
-
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Query, UploadFile, status
-from fastapi.responses import FileResponse
+from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
@@ -22,15 +20,25 @@ from app.services.jump_analysis_processor import JumpAnalysisProcessor, JumpVide
 from app.services.jump_video_analyzer_factory import get_jump_video_analyzer
 from app.services.jump_analysis_service import JumpAnalysisService
 from app.services.jump_video_storage import JumpVideoStorage
+from app.services.object_storage_factory import get_video_object_storage
+from app.storage.object_storage import ObjectStorage
 
 router = APIRouter(prefix="/jump-analyses", tags=["jump-analyses"])
 
 
-def _get_service(db: Session = Depends(get_db)) -> JumpAnalysisService:
+def _get_video_storage(
+    object_storage: ObjectStorage = Depends(get_video_object_storage),
+) -> JumpVideoStorage:
+    return JumpVideoStorage(object_storage, settings.MAX_VIDEO_UPLOAD_BYTES)
+
+
+def get_jump_analysis_service(
+    db: Session = Depends(get_db), video_storage: JumpVideoStorage = Depends(_get_video_storage)
+) -> JumpAnalysisService:
     return JumpAnalysisService(
         JumpAnalysisRepository(db),
         AthleteRepository(db),
-        JumpVideoStorage(settings.VIDEO_UPLOAD_DIR, settings.MAX_VIDEO_UPLOAD_BYTES),
+        video_storage,
         settings.VIDEO_CONSENT_VERSION,
     )
 
@@ -38,8 +46,9 @@ def _get_service(db: Session = Depends(get_db)) -> JumpAnalysisService:
 def _get_processor(
     session_factory: sessionmaker[Session] = Depends(get_session_factory),
     analyzer: JumpVideoAnalyzer = Depends(get_jump_video_analyzer),
+    video_storage: JumpVideoStorage = Depends(_get_video_storage),
 ) -> JumpAnalysisProcessor:
-    return JumpAnalysisProcessor(session_factory, analyzer)
+    return JumpAnalysisProcessor(session_factory, analyzer, video_storage)
 
 
 @router.post("/upload", response_model=JumpAnalysisRead, status_code=status.HTTP_202_ACCEPTED)
@@ -50,10 +59,10 @@ def upload_video(
     movement_type: MovementType = Form(MovementType.JUMP),
     video: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
-    service: JumpAnalysisService = Depends(_get_service),
+    service: JumpAnalysisService = Depends(get_jump_analysis_service),
     processor: JumpAnalysisProcessor = Depends(_get_processor),
 ) -> JumpAnalysisRead:
-    # `def` y no `async def`: la copia a disco corre en el threadpool, no en el event loop
+    # `def` y no `async def`: la subida al bucket corre en el threadpool, no en el event loop
     analysis = service.create_from_upload(
         current_user, athlete_id, movement_type, video.file, video.content_type
     )
@@ -67,7 +76,7 @@ def upload_video(
 @router.get("/team", response_model=list[JumpAnalysisRead])
 def list_team_analyses(
     coach: User = Depends(require_roles(UserRole.COACH)),
-    service: JumpAnalysisService = Depends(_get_service),
+    service: JumpAnalysisService = Depends(get_jump_analysis_service),
 ) -> list[JumpAnalysisRead]:
     return service.list_for_coach(coach)
 
@@ -76,7 +85,7 @@ def list_team_analyses(
 def get_analysis(
     analysis_id: int,
     current_user: User = Depends(get_current_user),
-    service: JumpAnalysisService = Depends(_get_service),
+    service: JumpAnalysisService = Depends(get_jump_analysis_service),
 ) -> JumpAnalysisRead:
     return service.get_analysis(current_user, analysis_id)
 
@@ -85,7 +94,7 @@ def get_analysis(
 def delete_analysis(
     analysis_id: int,
     current_user: User = Depends(get_current_user),
-    service: JumpAnalysisService = Depends(_get_service),
+    service: JumpAnalysisService = Depends(get_jump_analysis_service),
 ) -> None:
     service.delete_analysis(current_user, analysis_id)
 
@@ -94,7 +103,7 @@ def delete_analysis(
 def get_video_access(
     analysis_id: int,
     current_user: User = Depends(get_current_user),
-    service: JumpAnalysisService = Depends(_get_service),
+    service: JumpAnalysisService = Depends(get_jump_analysis_service),
 ) -> VideoAccessRead:
     # Mismo control de acceso que GET /{analysis_id}; el token sólo abre este video
     service.get_analysis(current_user, analysis_id)
@@ -102,24 +111,23 @@ def get_video_access(
     return VideoAccessRead(token=token, expires_at=expires_at)
 
 
-@router.get("/{analysis_id}/video", response_class=FileResponse)
-def stream_video(
+@router.get("/{analysis_id}/video", response_class=RedirectResponse, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
+def redirect_to_video(
     analysis_id: int,
     token: str = Query(...),
-    service: JumpAnalysisService = Depends(_get_service),
-) -> FileResponse:
-    # Token en la query (no Bearer): los reproductores de video no mandan headers,
-    # en especial en Flutter web. FileResponse atiende Range: se puede adelantar el video
+    service: JumpAnalysisService = Depends(get_jump_analysis_service),
+) -> RedirectResponse:
+    # Token en la query (no Bearer): los reproductores de video no mandan headers. El video se
+    # sirve desde la URL pública del bucket, que atiende Range: se puede adelantar el video
     verify_video_access_token(token, analysis_id)
-    path = service.get_video_path(analysis_id)
-    return FileResponse(path, media_type=mimetypes.guess_type(path.name)[0] or "application/octet-stream")
+    return RedirectResponse(service.get_video_url(analysis_id), status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
 
 @router.get("/by-athlete/{athlete_id}", response_model=list[JumpAnalysisRead])
 def list_by_athlete(
     athlete_id: int,
     current_user: User = Depends(get_current_user),
-    service: JumpAnalysisService = Depends(_get_service),
+    service: JumpAnalysisService = Depends(get_jump_analysis_service),
 ) -> list[JumpAnalysisRead]:
     return service.list_by_athlete(current_user, athlete_id)
 
@@ -132,7 +140,7 @@ def list_by_athlete(
 def ingest_result(
     analysis_id: int,
     result: JumpAnalysisResultIngest,
-    service: JumpAnalysisService = Depends(_get_service),
+    service: JumpAnalysisService = Depends(get_jump_analysis_service),
 ) -> JumpAnalysisRead:
     # Lo llama un proceso interno (pipeline de IA), no una persona: se autentica con
     # la API key de servicio del header X-Service-Api-Key, no con el JWT de usuarios

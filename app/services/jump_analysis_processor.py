@@ -17,6 +17,7 @@ from app.models.jump_analysis import JumpAnalysisStatus, MovementType
 from app.repositories.jump_analysis_repository import JumpAnalysisRepository
 from app.schemas.jump_analysis import JointAngleMeasurementCreate, JumpAnalysisResultIngest
 from app.services.jump_analysis_service import JumpAnalysisService
+from app.services.jump_video_storage import JumpVideoStorage
 
 logger = logging.getLogger(__name__)
 
@@ -94,9 +95,12 @@ class JumpAnalysisProcessor:
     análisis queda PENDING. Pasar a una cola (ver docs/design) cuando haya carga real.
     """
 
-    def __init__(self, session_factory: sessionmaker[Session], analyzer: JumpVideoAnalyzer) -> None:
+    def __init__(
+        self, session_factory: sessionmaker[Session], analyzer: JumpVideoAnalyzer, video_storage: JumpVideoStorage
+    ) -> None:
         self._session_factory = session_factory
         self._analyzer = analyzer
+        self._video_storage = video_storage
 
     def process(self, analysis_id: int) -> None:
         with self._session_factory() as db:
@@ -105,7 +109,8 @@ class JumpAnalysisProcessor:
             if analysis is None or analysis.status != JumpAnalysisStatus.PENDING:
                 return
             try:
-                result = self._analyzer.analyze(Path(analysis.video_reference), analysis.movement_type)
+                with self._video_storage.local_copy(analysis.video_reference) as video_path:
+                    result = self._analyzer.analyze(video_path, analysis.movement_type)
             except VideoAnalysisError as error:
                 logger.warning("Jump analysis %s failed: %s", analysis_id, error)
                 analysis.status = JumpAnalysisStatus.FAILED

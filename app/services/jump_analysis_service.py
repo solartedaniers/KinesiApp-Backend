@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import BinaryIO
 
 from app.core.exceptions import ErrorCode, ForbiddenException, NotFoundException
@@ -38,18 +37,16 @@ class JumpAnalysisService:
         video: BinaryIO,
         content_type: str | None,
     ) -> JumpAnalysis:
-        # Se autoriza antes de escribir en disco: un intruso no llega a ocupar espacio
+        # Se autoriza antes de subir: un intruso no llega a ocupar espacio en el bucket
         self._authorize_upload(current_user, athlete_id)
         self._require_video_consent(current_user)
-        video_path = self._video_storage.save(video, content_type)
+        video_url = self._video_storage.save(video, content_type)
         try:
             return self._repository.add(
-                JumpAnalysis(
-                    athlete_id=athlete_id, movement_type=movement_type, video_reference=str(video_path)
-                )
+                JumpAnalysis(athlete_id=athlete_id, movement_type=movement_type, video_reference=video_url)
             )
         except Exception:
-            self._video_storage.delete(video_path)
+            self._video_storage.delete(video_url)
             raise
 
     def get_analysis(self, current_user: User, analysis_id: int) -> JumpAnalysis:
@@ -63,22 +60,19 @@ class JumpAnalysisService:
     def delete_analysis(self, current_user: User, analysis_id: int) -> None:
         # Mismo criterio de acceso que la lectura (get_analysis): dueño, coach asignado o admin
         analysis = self.get_analysis(current_user, analysis_id)
-        video_path = Path(analysis.video_reference)
+        video_url = analysis.video_reference
         # Primero la fila (arrastra sus mediciones por cascade del ORM) y después el
-        # archivo: si el commit falla, el video sigue en disco y nada queda a medias
+        # objeto: si el commit falla, el video sigue en el bucket y nada queda a medias
         self._repository.delete(analysis)
-        self._video_storage.delete(video_path)
+        self._video_storage.delete(video_url)
 
-    def get_video_path(self, analysis_id: int) -> Path:
+    def get_video_url(self, analysis_id: int) -> str:
         # Sin chequeo de rol: quien llega aquí ya presentó un token de video emitido
         # tras pasar get_analysis (ver la ruta /{analysis_id}/video)
         analysis = self._repository.get(analysis_id)
         if analysis is None:
             raise NotFoundException("JumpAnalysis", analysis_id)
-        path = Path(analysis.video_reference)
-        if not path.is_file():
-            raise NotFoundException("JumpVideo", analysis_id, code=ErrorCode.VIDEO_NOT_FOUND)
-        return path
+        return analysis.video_reference
 
     def list_by_athlete(self, current_user: User, athlete_id: int) -> list[JumpAnalysis]:
         athlete = self._get_athlete_or_404(athlete_id)
