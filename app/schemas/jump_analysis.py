@@ -39,7 +39,8 @@ class JumpAnalysisRead(BaseModel):
 
     id: int
     athlete_id: int
-    # Sin video_reference: es una ruta de disco del servidor y el cliente no la necesita
+    # Sin video_reference: la URL pública del video sólo se entrega tras el control de acceso
+    # de video-access (ver la ruta /{analysis_id}/video)
     movement_type: MovementType
     status: JumpAnalysisStatus
     risk_score: float | None
