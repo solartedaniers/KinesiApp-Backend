@@ -1,11 +1,13 @@
 from pydantic import BaseModel, EmailStr, Field
 
+from app.core.config import settings
 from app.schemas.password_policy import StrongPassword
 
 
 class LoginRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=8, max_length=128)
+    # Sin la política de contraseñas: una cuenta anterior a la regla vigente debe poder entrar
+    password: str = Field(min_length=1, max_length=settings.PASSWORD_MAX_LENGTH)
 
 
 class TokenPair(BaseModel):
@@ -33,5 +35,5 @@ class PasswordResetConfirm(OTPVerifyRequest):
 
 class PasswordChange(BaseModel):
     # La actual no pasa por la política: puede ser anterior a la regla vigente
-    current_password: str = Field(min_length=1, max_length=128)
+    current_password: str = Field(min_length=1, max_length=settings.PASSWORD_MAX_LENGTH)
     new_password: StrongPassword

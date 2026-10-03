@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+from fastapi import status
+
 from app.core.config import settings
 from app.core.exceptions import (
     AppException,
@@ -27,16 +29,30 @@ from app.repositories.refresh_token_repository import RefreshTokenRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.auth import TokenPair
 from app.schemas.user import UserCreate
+from app.services.email_domain_checker import EmailDomainChecker
 
 
 class AuthService:
     """Orquesta registro, verificación por OTP, login, sesiones (JWT) y recuperación de contraseña."""
 
-    def __init__(self, user_repository: UserRepository, refresh_token_repository: RefreshTokenRepository) -> None:
+    def __init__(
+        self,
+        user_repository: UserRepository,
+        refresh_token_repository: RefreshTokenRepository,
+        email_domain_checker: EmailDomainChecker,
+    ) -> None:
         self._users = user_repository
         self._refresh_tokens = refresh_token_repository
+        self._email_domain_checker = email_domain_checker
 
     def register(self, data: UserCreate) -> tuple[User, str]:
+        # Aquí y no en el schema: la consulta DNS bloquea, y el body se valida en el event loop
+        if not self._email_domain_checker.is_deliverable(data.email):
+            raise AppException(
+                "The email domain does not exist or does not accept email",
+                status.HTTP_422_UNPROCESSABLE_ENTITY,
+                ErrorCode.EMAIL_DOMAIN_UNDELIVERABLE,
+            )
         existing_user = self._users.get_by_email(data.email)
         if existing_user is not None and existing_user.is_verified:
             raise ConflictException(
@@ -81,7 +97,13 @@ class AuthService:
 
     def login(self, email: str, password: str) -> TokenPair:
         user = self._users.get_by_email(email)
-        if user is None or not verify_password(password, user.hashed_password):
+        # Sólo se revela que el correo no existe para invitar a registrarse; con una contraseña
+        # incorrecta el error sigue siendo genérico. El registro ya revela qué correos existen
+        if user is None:
+            raise UnauthorizedException(
+                "No account is registered with this email", code=ErrorCode.EMAIL_NOT_REGISTERED
+            )
+        if not verify_password(password, user.hashed_password):
             raise UnauthorizedException("Incorrect email or password", code=ErrorCode.INVALID_CREDENTIALS)
         # Verificado antes que activo: el registro deja is_active=False hasta verificar, así que
         # al revés una cuenta pendiente recibiría "deshabilitada" en vez de "verifica tu correo"

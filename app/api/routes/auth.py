@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.email import AuthEmailService, EmailDeliveryError, get_auth_email_service
 from app.core.exceptions import ErrorCode, ServiceUnavailableException
 from app.core.security import get_current_user
 from app.models.user import User
@@ -18,13 +17,20 @@ from app.schemas.auth import (
     TokenPair,
 )
 from app.schemas.user import UserCreate, UserRead
+from app.mail.auth_email_service import AuthEmailService
+from app.mail.email_sender import EmailDeliveryError
 from app.services.auth_service import AuthService
+from app.services.email_domain_checker import EmailDomainChecker, get_email_domain_checker
+from app.services.email_factory import get_auth_email_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _get_service(db: Session = Depends(get_db)) -> AuthService:
-    return AuthService(UserRepository(db), RefreshTokenRepository(db))
+def _get_service(
+    db: Session = Depends(get_db),
+    email_domain_checker: EmailDomainChecker = Depends(get_email_domain_checker),
+) -> AuthService:
+    return AuthService(UserRepository(db), RefreshTokenRepository(db), email_domain_checker)
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
