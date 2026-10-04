@@ -21,20 +21,20 @@ class ManagedAthleteService:
         return self._repository.add(AthleteProfile(coach_id=coach_id, **data.model_dump()))
 
     def update(self, coach_id: int, athlete_id: int, data: ManagedAthleteUpdate) -> AthleteProfile:
-        profile = self._get_owned(coach_id, athlete_id)
+        profile = self.get_owned(coach_id, athlete_id)
         for field, value in data.changes().items():
             setattr(profile, field, value)
         return self._repository.add(profile)
 
     def delete(self, coach_id: int, athlete_id: int) -> None:
-        self._repository.delete(self._get_owned(coach_id, athlete_id))
+        self._repository.delete(self.get_owned(coach_id, athlete_id))
 
-    def set_avatar(self, coach_id: int, athlete_id: int, avatar_data_url: str | None) -> AthleteProfile:
-        profile = self._get_owned(coach_id, athlete_id)
-        profile.avatar_data_url = avatar_data_url
+    def set_avatar(self, coach_id: int, athlete_id: int, avatar_url: str | None) -> AthleteProfile:
+        profile = self.get_owned(coach_id, athlete_id)
+        profile.avatar_url = avatar_url
         return self._repository.add(profile)
 
-    def _get_owned(self, coach_id: int, athlete_id: int) -> AthleteProfile:
+    def get_owned(self, coach_id: int, athlete_id: int) -> AthleteProfile:
         # 404 (no 403) si no es suyo: no revela qué ids existen para otros coaches
         profile = self._repository.get_managed_by_coach(athlete_id, coach_id)
         if profile is None:
