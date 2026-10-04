@@ -2,9 +2,10 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
-from app.core.security import require_roles
+from app.core.security import get_current_user, require_roles
 from app.models.user import User, UserRole
 from app.repositories.athlete_repository import AthleteRepository
+from app.repositories.team_repository import TeamRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.athlete import (
     AthleteProfileCreate,
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/athletes", tags=["athletes"])
 
 
 def _get_service(db: Session = Depends(get_db)) -> AthleteService:
-    return AthleteService(AthleteRepository(db), UserRepository(db))
+    return AthleteService(AthleteRepository(db), UserRepository(db), TeamRepository(db))
 
 
 # Rutas estáticas (/me, /coached) van antes de /{athlete_id}, si no FastAPI intenta
@@ -65,7 +66,12 @@ def list_athletes(
     return service.list_all(skip, limit)
 
 
-@router.post("", response_model=AthleteProfileRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=AthleteProfileRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_roles(UserRole.ADMIN))],
+)
 def create_profile(
     data: AthleteProfileCreate, service: AthleteService = Depends(_get_service)
 ) -> AthleteProfileRead:
@@ -73,8 +79,13 @@ def create_profile(
 
 
 @router.get("/{athlete_id}", response_model=AthleteProfileRead)
-def get_profile(athlete_id: int, service: AthleteService = Depends(_get_service)) -> AthleteProfileRead:
-    return service.get_profile(athlete_id)
+def get_profile(
+    athlete_id: int,
+    current_user: User = Depends(get_current_user),
+    service: AthleteService = Depends(_get_service),
+) -> AthleteProfileRead:
+    # Antes era pública: exponía la ficha biométrica de cualquier deportista
+    return service.get_profile_for(current_user, athlete_id)
 
 
 @router.patch(

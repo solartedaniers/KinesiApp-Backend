@@ -1,7 +1,8 @@
 from app.core.exceptions import AppException, ConflictException, ErrorCode, NotFoundException
 from app.models.athlete import AthleteProfile
-from app.models.user import UserRole
+from app.models.user import User, UserRole
 from app.repositories.athlete_repository import AthleteRepository
+from app.repositories.team_repository import TeamRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.athlete import (
     AthleteProfileBase,
@@ -14,14 +15,23 @@ from app.schemas.athlete import (
 class AthleteService:
     """Alta y consulta de perfiles de deportista. Un perfil pertenece a un único user."""
 
-    def __init__(self, repository: AthleteRepository, user_repository: UserRepository) -> None:
+    def __init__(
+        self, repository: AthleteRepository, user_repository: UserRepository, team_repository: TeamRepository
+    ) -> None:
         self._repository = repository
         self._user_repository = user_repository
+        self._team_repository = team_repository
 
     def create_profile(self, data: AthleteProfileCreate) -> AthleteProfile:
         # Ruta administrativa: el user_id llega en el body, así que sí hay que validar que exista
-        if self._user_repository.get(data.user_id) is None:
+        user = self._user_repository.get(data.user_id)
+        if user is None:
             raise NotFoundException("User", data.user_id)
+        # La ficha biométrica es de un deportista: un coach o un admin no tienen
+        if user.role != UserRole.ATHLETE:
+            raise AppException(
+                f"User '{data.user_id}' does not have the athlete role", code=ErrorCode.INVALID_ROLE_ASSIGNMENT
+            )
         return self._create_for_user(data.user_id, data)
 
     def create_own_profile(self, user_id: int, data: AthleteProfileSelfCreate) -> AthleteProfile:
@@ -31,6 +41,18 @@ class AthleteService:
     def get_profile(self, athlete_id: int) -> AthleteProfile:
         profile = self._repository.get(athlete_id)
         if profile is None:
+            raise NotFoundException("AthleteProfile", athlete_id)
+        return profile
+
+    def get_profile_for(self, current_user: User, athlete_id: int) -> AthleteProfile:
+        """La ficha la ven el propio deportista, su coach asignado y un admin; para el resto, 404."""
+        profile = self._repository.get(athlete_id)
+        allowed = profile is not None and (
+            current_user.role == UserRole.ADMIN
+            or (current_user.role == UserRole.ATHLETE and profile.user_id == current_user.id)
+            or (current_user.role == UserRole.COACH and profile.coach_id == current_user.id)
+        )
+        if not allowed:
             raise NotFoundException("AthleteProfile", athlete_id)
         return profile
 
@@ -65,6 +87,8 @@ class AthleteService:
             )
 
         profile.coach_id = coach_id
+        # Sus equipos con el coach anterior ya no le corresponden; los de un admin se conservan
+        self._team_repository.remove_athlete_from_other_coaches_teams(athlete_id, coach_id)
         return self._repository.add(profile)
 
     def _create_for_user(self, user_id: int, data: AthleteProfileBase) -> AthleteProfile:

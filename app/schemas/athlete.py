@@ -3,13 +3,15 @@ from datetime import date
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.athlete import Gender
+from app.schemas.birth_date import BirthDate
+from app.schemas.person_name import PersonName
 
 
 class AthleteProfileBase(BaseModel):
     gender: Gender
     height_cm: float = Field(gt=0, le=300)
     weight_kg: float = Field(gt=0, le=400)
-    birth_date: date
+    birth_date: BirthDate
 
 
 class AthleteProfileCreate(AthleteProfileBase):
@@ -26,7 +28,7 @@ class AthleteProfileUpdate(BaseModel):
     gender: Gender | None = None
     height_cm: float | None = Field(default=None, gt=0, le=300)
     weight_kg: float | None = Field(default=None, gt=0, le=400)
-    birth_date: date | None = None
+    birth_date: BirthDate | None = None
 
     def changes(self) -> dict:
         # exclude_none: un null explícito no borra columnas obligatorias, se ignora
@@ -36,11 +38,12 @@ class AthleteProfileUpdate(BaseModel):
 class ManagedAthleteCreate(AthleteProfileBase):
     """Deportista sin cuenta propia, creado y gestionado por un coach."""
 
-    full_name: str = Field(min_length=1, max_length=150)
+    # Misma regla de sólo letras que el nombre de una cuenta
+    full_name: PersonName
 
 
 class ManagedAthleteUpdate(AthleteProfileUpdate):
-    full_name: str | None = Field(default=None, min_length=1, max_length=150)
+    full_name: PersonName | None = None
 
 
 class CoachAssignment(BaseModel):
