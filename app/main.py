@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import athletes, auth, chat, jump_analyses, managed_athletes, public, users
+from app.api.routes import athletes, auth, chat, jump_analyses, managed_athletes, public, teams, users
 from app.core.config import settings
 from app.core.exceptions import AppException, app_exception_handler
 
@@ -29,6 +29,7 @@ app.include_router(athletes.router, prefix=settings.API_V1_PREFIX)
 app.include_router(managed_athletes.router, prefix=settings.API_V1_PREFIX)
 app.include_router(jump_analyses.router, prefix=settings.API_V1_PREFIX)
 app.include_router(chat.router, prefix=settings.API_V1_PREFIX)
+app.include_router(teams.router, prefix=settings.API_V1_PREFIX)
 app.include_router(public.router, prefix=settings.API_V1_PREFIX)
 
 

@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     PASSWORD_MIN_LENGTH: int = Field(default=8, ge=8)
     PASSWORD_MAX_LENGTH: int = Field(default=128, gt=0)
 
+    # Rango de edad admitido para la ficha de un deportista (app/schemas/birth_date.py). El
+    # frontend lo replica en lib/validation.ts
+    ATHLETE_MIN_AGE_YEARS: int = Field(default=5, ge=0)
+    ATHLETE_MAX_AGE_YEARS: int = Field(default=100, gt=0)
+
     # Verificación DNS/MX del dominio del correo en el registro (app/services/email_domain_checker.py)
     EMAIL_DNS_TIMEOUT_SECONDS: int = Field(default=5, gt=0)
 
@@ -138,6 +143,10 @@ class Settings(BaseSettings):
     # Vida del token que autoriza reproducir un video (va en la URL: los reproductores
     # no pueden mandar el header Authorization), por eso corta
     VIDEO_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=10, gt=0)
+    # Token con el que el navegador sube un video directo a la API (el de sesión vive en una
+    # cookie httpOnly que el navegador no puede leer). Cubre toda la subida: el token se valida
+    # cuando termina de llegar el cuerpo, así que debe durar más que la subida más lenta
+    VIDEO_UPLOAD_TOKEN_EXPIRE_MINUTES: int = Field(default=30, gt=0)
 
     @property
     def database_url(self) -> URL:

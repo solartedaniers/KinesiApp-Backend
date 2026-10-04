@@ -10,7 +10,7 @@ import os
 from sqlalchemy import inspect
 
 from app.core.database import SessionLocal, engine
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserCreate
 from app.services.user_service import UserService
@@ -47,7 +47,7 @@ def create_admin() -> None:
             user = service.create_user(UserCreate(email=email, password=password, full_name=full_name))
 
         # Idempotente: si ya existía, sólo lo promueve; no toca su contraseña
-        user = service.set_role(user.id, UserRole.ADMIN)
+        user = service.promote_to_admin(user.id)
         if not user.is_verified:
             user.is_verified = True
             repository.add(user)
