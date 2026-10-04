@@ -49,6 +49,11 @@ class JumpAnalysisService:
             self._video_storage.delete(video_url)
             raise
 
+    def authorize_upload(self, current_user: User, athlete_id: int) -> None:
+        """Las mismas reglas que la subida, antes de emitir un token de subida."""
+        self._authorize_upload(current_user, athlete_id)
+        self._require_video_consent(current_user)
+
     def get_analysis(self, current_user: User, analysis_id: int) -> JumpAnalysis:
         analysis = self._repository.get(analysis_id)
         if analysis is None:
@@ -58,8 +63,11 @@ class JumpAnalysisService:
         return analysis
 
     def delete_analysis(self, current_user: User, analysis_id: int) -> None:
-        # Mismo criterio de acceso que la lectura (get_analysis): dueño, coach asignado o admin
         analysis = self.get_analysis(current_user, analysis_id)
+        # Leer no basta para borrar: el coach sólo lee las grabaciones de un deportista con cuenta.
+        # El admin puede borrar (moderación)
+        if current_user.role != UserRole.ADMIN and not self._manages_recordings(current_user, analysis.athlete):
+            raise ForbiddenException("You can't delete this athlete's analyses")
         video_url = analysis.video_reference
         # Primero la fila (arrastra sus mediciones por cascade del ORM) y después el
         # objeto: si el commit falla, el video sigue en el bucket y nada queda a medias
@@ -108,8 +116,16 @@ class JumpAnalysisService:
 
     def _authorize_upload(self, current_user: User, athlete_id: int) -> None:
         athlete = self._get_athlete_or_404(athlete_id)
-        # El propio deportista sube sus saltos; los gestionados (sin cuenta) los sube su coach
-        self._authorize_athlete_access(current_user, athlete, allow_coach=athlete.is_managed)
+        # El propio deportista sube sus saltos; los gestionados (sin cuenta) los sube su coach.
+        # El admin administra, no entrena: no sube videos
+        if not self._manages_recordings(current_user, athlete):
+            raise ForbiddenException("You can't upload videos for this athlete")
+
+    @staticmethod
+    def _manages_recordings(current_user: User, athlete: AthleteProfile) -> bool:
+        if current_user.role == UserRole.ATHLETE:
+            return athlete.user_id == current_user.id
+        return current_user.role == UserRole.COACH and athlete.is_managed and athlete.coach_id == current_user.id
 
     def _require_video_consent(self, uploader: User) -> None:
         # Quien graba/sube debe haber aceptado la versión vigente del texto: el propio

@@ -51,6 +51,17 @@ class JumpAnalysisRead(BaseModel):
     angle_measurements: list[JointAngleMeasurementRead] = []
 
 
+class VideoUploadTokenCreate(BaseModel):
+    athlete_id: int
+
+
+class VideoUploadTokenRead(BaseModel):
+    """Token para que el navegador suba un video de ese deportista directo a la API."""
+
+    token: str
+    expires_at: datetime
+
+
 class VideoAccessRead(BaseModel):
     """Token de corta vida para reproducir el video de un análisis."""
 

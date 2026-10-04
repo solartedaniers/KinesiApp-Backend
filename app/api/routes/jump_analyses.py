@@ -4,9 +4,13 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import settings
 from app.core.database import get_db, get_session_factory
+from app.core.exceptions import ForbiddenException
 from app.core.security import (
+    Uploader,
     create_video_access_token,
+    create_video_upload_token,
     get_current_user,
+    get_uploader,
     require_roles,
     require_service_api_key,
     verify_video_access_token,
@@ -15,7 +19,13 @@ from app.models.jump_analysis import MovementType
 from app.models.user import User, UserRole
 from app.repositories.athlete_repository import AthleteRepository
 from app.repositories.jump_analysis_repository import JumpAnalysisRepository
-from app.schemas.jump_analysis import JumpAnalysisRead, JumpAnalysisResultIngest, VideoAccessRead
+from app.schemas.jump_analysis import (
+    JumpAnalysisRead,
+    JumpAnalysisResultIngest,
+    VideoAccessRead,
+    VideoUploadTokenCreate,
+    VideoUploadTokenRead,
+)
 from app.services.jump_analysis_processor import JumpAnalysisProcessor, JumpVideoAnalyzer
 from app.services.jump_video_analyzer_factory import get_jump_video_analyzer
 from app.services.jump_analysis_service import JumpAnalysisService
@@ -58,18 +68,34 @@ def upload_video(
     # Opcional para no romper clientes anteriores: sin él, se asume salto
     movement_type: MovementType = Form(MovementType.JUMP),
     video: UploadFile = File(...),
-    current_user: User = Depends(get_current_user),
+    uploader: Uploader = Depends(get_uploader),
     service: JumpAnalysisService = Depends(get_jump_analysis_service),
     processor: JumpAnalysisProcessor = Depends(_get_processor),
 ) -> JumpAnalysisRead:
+    # Un token de subida sólo vale para el deportista para el que se emitió
+    if uploader.allowed_athlete_id is not None and uploader.allowed_athlete_id != athlete_id:
+        raise ForbiddenException("The upload token was issued for another athlete")
     # `def` y no `async def`: la subida al bucket corre en el threadpool, no en el event loop
     analysis = service.create_from_upload(
-        current_user, athlete_id, movement_type, video.file, video.content_type
+        uploader.user, athlete_id, movement_type, video.file, video.content_type
     )
     # Corre después de enviar la respuesta: el cliente recibe 202 + PENDING al instante
     # y consulta GET /{analysis_id} hasta ver PROCESSED o FAILED
     background_tasks.add_task(processor.process, analysis.id)
     return analysis
+
+
+@router.post("/upload-token", response_model=VideoUploadTokenRead)
+def create_upload_token(
+    data: VideoUploadTokenCreate,
+    current_user: User = Depends(get_current_user),
+    service: JumpAnalysisService = Depends(get_jump_analysis_service),
+) -> VideoUploadTokenRead:
+    # Mismas reglas que la subida (rol, dueño o coach del gestionado, consentimiento) antes de emitir
+    # nada: el error sale aquí, no después de que el navegador mandó todo el video
+    service.authorize_upload(current_user, data.athlete_id)
+    token, expires_at = create_video_upload_token(current_user.id, data.athlete_id)
+    return VideoUploadTokenRead(token=token, expires_at=expires_at)
 
 
 # Antes de /{analysis_id}: si no, "team" se intentaría parsear como id
