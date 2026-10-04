@@ -125,6 +125,11 @@ class AuthService:
         # Rotación: el token usado se revoca de inmediato, así un refresh token reutilizado no sirve
         self._refresh_tokens.revoke(stored)
         user = self._get_user_by_id(stored.user_id)
+        # Una cuenta desactivada por un admin no obtiene tokens nuevos
+        if not user.is_active:
+            raise UnauthorizedException(
+                "Refresh token is invalid, expired or revoked", code=ErrorCode.INVALID_REFRESH_TOKEN
+            )
         return self._issue_tokens(user)
 
     def logout(self, raw_refresh_token: str) -> None:
