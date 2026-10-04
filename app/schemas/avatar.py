@@ -4,8 +4,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-# ponytail: el avatar se guarda como data URL en la DB (imágenes chicas, ya
-# redimensionadas por la app); pasar a object storage (S3/GCS) si crecen
+# El cliente ya la redimensiona y comprime antes de enviarla (workers/avatar.worker.ts)
 MAX_AVATAR_BYTES = 1_000_000
 
 AvatarContentType = Literal["image/jpeg", "image/png", "image/webp"]
@@ -38,5 +37,6 @@ class AvatarUpload(BaseModel):
             raise ValueError("Image content does not match content_type")
         return self
 
-    def to_data_url(self) -> str:
-        return f"data:{self.content_type};base64,{self.data_base64}"
+    def content(self) -> bytes:
+        # Ya validado como base64 en _check_image
+        return base64.b64decode(self.data_base64)

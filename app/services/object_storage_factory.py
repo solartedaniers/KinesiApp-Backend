@@ -1,6 +1,9 @@
 from functools import lru_cache
 
+from fastapi import Depends
+
 from app.core.config import Settings, settings
+from app.services.avatar_storage import AvatarStorage
 from app.storage.neon_object_storage import NeonObjectStorage
 from app.storage.object_storage import ObjectStorage, UnconfiguredObjectStorage
 
@@ -23,3 +26,12 @@ def build_object_storage(config: Settings, bucket: str) -> ObjectStorage:
 def get_video_object_storage() -> ObjectStorage:
     # Un cliente de boto3 por proceso (es thread-safe), reutilizado entre requests
     return build_object_storage(settings, settings.S3_VIDEOS_BUCKET)
+
+
+@lru_cache
+def get_image_object_storage() -> ObjectStorage:
+    return build_object_storage(settings, settings.S3_IMAGES_BUCKET)
+
+
+def get_avatar_storage(object_storage: ObjectStorage = Depends(get_image_object_storage)) -> AvatarStorage:
+    return AvatarStorage(object_storage)
