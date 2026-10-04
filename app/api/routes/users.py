@@ -6,7 +6,16 @@ from app.core.security import get_current_user, require_roles
 from app.models.user import User, UserRole
 from app.repositories.user_repository import UserRepository
 from app.schemas.avatar import AvatarUpload
-from app.schemas.user import UserCreate, UserProfileUpdate, UserRead, UserRoleUpdate, VideoConsentGrant
+from app.services.avatar_storage import AvatarStorage
+from app.services.object_storage_factory import get_avatar_storage
+from app.schemas.user import (
+    UserCreate,
+    UserProfileUpdate,
+    UserRead,
+    UserRoleUpdate,
+    UserStatusUpdate,
+    VideoConsentGrant,
+)
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -16,10 +25,15 @@ def _get_service(db: Session = Depends(get_db)) -> UserService:
     return UserService(UserRepository(db))
 
 
-@router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=UserRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_roles(UserRole.ADMIN))],
+)
 def create_user(data: UserCreate, service: UserService = Depends(_get_service)) -> UserRead:
-    # Alta pública heredada de antes del módulo de auth; sigue abierta por compatibilidad.
-    # El flujo "real" con verificación de email es /auth/register
+    # Alta por un admin (antes era pública y saltaba la verificación). La cuenta queda sin verificar:
+    # su dueño la activa con el código que pide al iniciar sesión. El registro público es /auth/register
     return service.create_user(data)
 
 
@@ -38,21 +52,26 @@ def upload_my_avatar(
     data: AvatarUpload,
     current_user: User = Depends(get_current_user),
     service: UserService = Depends(_get_service),
+    avatars: AvatarStorage = Depends(get_avatar_storage),
 ) -> UserRead:
-    return service.set_avatar(current_user, data.to_data_url())
+    # Sube al bucket de imágenes, guarda la URL y recién entonces borra la foto anterior
+    return avatars.replace(current_user.avatar_url, data, lambda url: service.set_avatar(current_user, url))
 
 
 @router.delete("/me/avatar", response_model=UserRead)
 def delete_my_avatar(
-    current_user: User = Depends(get_current_user), service: UserService = Depends(_get_service)
+    current_user: User = Depends(get_current_user),
+    service: UserService = Depends(_get_service),
+    avatars: AvatarStorage = Depends(get_avatar_storage),
 ) -> UserRead:
-    return service.set_avatar(current_user, None)
+    return avatars.replace(current_user.avatar_url, None, lambda url: service.set_avatar(current_user, url))
 
 
 @router.post("/me/video-consent", response_model=UserRead)
 def grant_my_video_consent(
     data: VideoConsentGrant,
-    current_user: User = Depends(get_current_user),
+    # Sólo quien sube videos: el deportista, o el coach por sus gestionados
+    current_user: User = Depends(require_roles(UserRole.ATHLETE, UserRole.COACH)),
     service: UserService = Depends(_get_service),
 ) -> UserRead:
     return service.grant_video_consent(current_user, data.version)
@@ -71,10 +90,21 @@ def list_users(
     return service.list_users(skip, limit)
 
 
-@router.patch(
-    "/{user_id}/role", response_model=UserRead, dependencies=[Depends(require_roles(UserRole.ADMIN))]
-)
+@router.patch("/{user_id}/role", response_model=UserRead)
 def update_user_role(
-    user_id: int, data: UserRoleUpdate, service: UserService = Depends(_get_service)
+    user_id: int,
+    data: UserRoleUpdate,
+    admin: User = Depends(require_roles(UserRole.ADMIN)),
+    service: UserService = Depends(_get_service),
 ) -> UserRead:
-    return service.set_role(user_id, data.role)
+    return service.set_role(admin, user_id, data.role)
+
+
+@router.patch("/{user_id}/status", response_model=UserRead)
+def update_user_status(
+    user_id: int,
+    data: UserStatusUpdate,
+    admin: User = Depends(require_roles(UserRole.ADMIN)),
+    service: UserService = Depends(_get_service),
+) -> UserRead:
+    return service.set_active(admin, user_id, data.is_active)

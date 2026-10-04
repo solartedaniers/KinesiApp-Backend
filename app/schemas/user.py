@@ -27,6 +27,10 @@ class UserRoleUpdate(BaseModel):
     role: UserRole
 
 
+class UserStatusUpdate(BaseModel):
+    is_active: bool
+
+
 class VideoConsentGrant(BaseModel):
     version: int = Field(gt=0)
 
@@ -41,6 +45,6 @@ class UserRead(BaseModel):
     is_active: bool
     is_verified: bool
     created_at: datetime
-    avatar_data_url: str | None = None
+    avatar_url: str | None = None
     video_consent_given_at: datetime | None = None
     video_consent_version: int | None = None
