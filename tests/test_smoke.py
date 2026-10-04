@@ -9,15 +9,11 @@ def _auth_headers(token: str) -> dict[str, str]:
 def test_full_flow(client, register_and_verify, grant_consent, upload_jump):
     assert client.get("/health").status_code == 200
 
-    # Alta legacy (POST /users, sin verificación) sigue abierta; se cubre aparte su regla de unicidad
+    # El alta directa (POST /users) ya no es pública: sólo un admin (ver test_permissions.py)
     r = client.post(
         "/api/v1/users", json={"email": "legacy@a.com", "password": "Abcd1234!", "full_name": "Ana"}
     )
-    assert r.status_code == 201, r.text
-    r = client.post(
-        "/api/v1/users", json={"email": "legacy@a.com", "password": "Abcd1234!", "full_name": "Ana"}
-    )
-    assert r.status_code == 409
+    assert r.status_code in (401, 403)
 
     # Flujo real: un ATHLETE autenticado crea su perfil y sube su propio salto
     token = register_and_verify("ana@kinesiapp.com")

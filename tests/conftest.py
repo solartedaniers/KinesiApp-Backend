@@ -37,7 +37,7 @@ from app.services.email_domain_checker import get_email_domain_checker
 from app.services.email_factory import get_email_sender
 from app.services.jump_video_analyzer_factory import get_jump_video_analyzer
 from app.services.jump_video_storage import JumpVideoStorage
-from app.services.object_storage_factory import get_video_object_storage
+from app.services.object_storage_factory import get_image_object_storage, get_video_object_storage
 from app.storage.object_storage import ObjectStorageError
 
 engine = create_engine(
@@ -94,16 +94,15 @@ class FakeLlmClient:
 class FakeObjectStorage:
     """Sustituye al almacenamiento de Neon en los tests: los objetos viven en memoria, sin red."""
 
-    PUBLIC_BASE_URL = "https://storage.test/videos/"
-
-    def __init__(self) -> None:
+    def __init__(self, bucket: str = "videos") -> None:
+        self.public_base_url = f"https://storage.test/{bucket}/"
         self.objects: dict[str, tuple[bytes, str]] = {}
         self.error: Exception | None = None
 
     def upload(self, source, key, content_type):
         if self.error is not None:
             raise self.error
-        url = self.PUBLIC_BASE_URL + key
+        url = self.public_base_url + key
         self.objects[url] = (source.read(), content_type)
         return url
 
@@ -125,6 +124,15 @@ def fake_object_storage():
     app.dependency_overrides[get_video_object_storage] = lambda: fake
     yield fake
     del app.dependency_overrides[get_video_object_storage]
+
+
+@pytest.fixture(autouse=True)
+def fake_image_storage():
+    # Bucket de imágenes (fotos de perfil), separado del de videos como en Neon
+    fake = FakeObjectStorage(bucket="images")
+    app.dependency_overrides[get_image_object_storage] = lambda: fake
+    yield fake
+    del app.dependency_overrides[get_image_object_storage]
 
 
 @pytest.fixture

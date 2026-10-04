@@ -67,7 +67,8 @@ def test_coach_and_athlete_have_separate_threads_and_strangers_are_rejected(
     )
     _send(client, athlete_token, analysis_id, "pregunta del deportista")
     assert _send(client, coach_token, analysis_id, "pregunta del coach").status_code == 200
-    assert _send(client, admin_token, analysis_id, "pregunta del admin").status_code == 200
+    # El admin administra, no conversa sobre análisis (Fase 4: el chat es de deportista y coach)
+    assert _send(client, admin_token, analysis_id, "pregunta del admin").status_code == 403
 
     coach_thread = client.get(_url(analysis_id), headers=_auth_headers(coach_token)).json()
     athlete_thread = client.get(_url(analysis_id), headers=_auth_headers(athlete_token)).json()
