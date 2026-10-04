@@ -33,6 +33,10 @@ class ErrorCode(str, enum.Enum):
     CHAT_RATE_LIMITED = "chat_rate_limited"
     ASSISTANT_UNAVAILABLE = "assistant_unavailable"
     STORAGE_UNAVAILABLE = "storage_unavailable"
+    TEAM_NAME_TAKEN = "team_name_taken"
+    INVALID_TEAM_MEMBER = "invalid_team_member"
+    CANNOT_MODIFY_OWN_ACCOUNT = "cannot_modify_own_account"
+    COACH_HAS_ATHLETES = "coach_has_athletes"
 
 
 class AppException(Exception):

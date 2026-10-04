@@ -1,5 +1,6 @@
 import hashlib
 import secrets
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
@@ -20,7 +21,7 @@ _bearer_scheme = HTTPBearer(auto_error=True)
 # Header propio para procesos internos: no se mezcla con el JWT de los usuarios
 _service_api_key_scheme = APIKeyHeader(name="X-Service-Api-Key", auto_error=False)
 
-TokenType = Literal["access", "refresh", "video"]
+TokenType = Literal["access", "refresh", "video", "upload"]
 
 
 def hash_password(password: str) -> str:
@@ -90,6 +91,15 @@ def create_video_access_token(analysis_id: int) -> tuple[str, datetime]:
     return token, expires_at
 
 
+def create_video_upload_token(user_id: int, athlete_id: int) -> tuple[str, datetime]:
+    # Sólo sirve para subir videos de UN deportista: get_current_user lo rechaza como access token,
+    # así que si se filtra no abre ninguna otra operación de la cuenta
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.VIDEO_UPLOAD_TOKEN_EXPIRE_MINUTES)
+    payload = {"sub": str(user_id), "type": "upload", "athlete_id": athlete_id, "exp": expires_at}
+    token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return token, expires_at
+
+
 def verify_video_access_token(token: str, analysis_id: int) -> None:
     if decode_token(token, expected_type="video").get("sub") != str(analysis_id):
         raise UnauthorizedException("Token is not valid for this video")
@@ -116,6 +126,31 @@ def get_current_user(
     if user is None or not user.is_active:
         raise UnauthorizedException("User does not exist or is inactive")
     return user
+
+
+@dataclass(frozen=True)
+class Uploader:
+    """Quién sube un video y, si llegó con un token de subida, el único deportista que puede recibirlo."""
+
+    user: User
+    allowed_athlete_id: int | None
+
+
+def get_uploader(
+    credentials: HTTPAuthorizationCredentials = Depends(_bearer_scheme),
+    db: Session = Depends(get_db),
+) -> Uploader:
+    # Acepta el access token de siempre (BFF, tests) o un token de subida (navegador)
+    try:
+        payload = jwt.decode(credentials.credentials, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+    except jwt.PyJWTError as exc:
+        raise UnauthorizedException("Invalid or expired token") from exc
+    if payload.get("type") not in ("access", "upload"):
+        raise UnauthorizedException("Incorrect token type")
+    user = UserRepository(db).get(int(payload["sub"]))
+    if user is None or not user.is_active:
+        raise UnauthorizedException("User does not exist or is inactive")
+    return Uploader(user=user, allowed_athlete_id=payload.get("athlete_id") if payload["type"] == "upload" else None)
 
 
 def require_roles(*allowed_roles: UserRole):

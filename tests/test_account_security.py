@@ -3,6 +3,7 @@ import base64
 import re
 
 from app.models.user import User
+from app.storage.object_storage import ObjectStorageError
 
 PNG_BYTES = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
 PNG_AVATAR = {"content_type": "image/png", "data_base64": base64.b64encode(PNG_BYTES).decode()}
@@ -125,7 +126,7 @@ def test_change_password_flow(client, register_and_verify, db_session):
     assert client.post("/api/v1/auth/login", json={"email": "change@kinesiapp.com", "password": "Another123!"}).status_code == 200
 
 
-def test_update_profile_and_avatar(client, register_and_verify):
+def test_update_profile_and_avatar(client, register_and_verify, fake_image_storage):
     token = register_and_verify("me@kinesiapp.com")
 
     assert client.patch("/api/v1/users/me", json={"full_name": "Nombre 2"}, headers=_auth(token)).status_code == 422
@@ -135,10 +136,28 @@ def test_update_profile_and_avatar(client, register_and_verify):
 
     r = client.put("/api/v1/users/me/avatar", json=PNG_AVATAR, headers=_auth(token))
     assert r.status_code == 200
-    assert r.json()["avatar_data_url"].startswith("data:image/png;base64,")
+    # Se guarda la URL pública del objeto en el bucket de imágenes, no la imagen
+    first_url = r.json()["avatar_url"]
+    assert first_url.startswith(fake_image_storage.public_base_url) and first_url.endswith(".png")
+    assert fake_image_storage.objects[first_url] == (base64.b64decode(PNG_AVATAR["data_base64"]), "image/png")
+
+    # Cambiarla reemplaza el objeto: la anterior se borra del bucket
+    second_url = client.put("/api/v1/users/me/avatar", json=PNG_AVATAR, headers=_auth(token)).json()["avatar_url"]
+    assert second_url != first_url and set(fake_image_storage.objects) == {second_url}
 
     r = client.delete("/api/v1/users/me/avatar", headers=_auth(token))
-    assert r.json()["avatar_data_url"] is None
+    assert r.json()["avatar_url"] is None
+    assert fake_image_storage.objects == {}
+
+
+def test_avatar_storage_failure_is_503_and_keeps_the_current_photo(client, register_and_verify, fake_image_storage):
+    token = register_and_verify("storage-down@kinesiapp.com")
+    url = client.put("/api/v1/users/me/avatar", json=PNG_AVATAR, headers=_auth(token)).json()["avatar_url"]
+    fake_image_storage.error = ObjectStorageError("down")
+
+    r = client.put("/api/v1/users/me/avatar", json=PNG_AVATAR, headers=_auth(token))
+    assert (r.status_code, r.json()["code"]) == (503, "storage_unavailable")
+    assert client.get("/api/v1/auth/me", headers=_auth(token)).json()["avatar_url"] == url
 
 
 def test_avatar_rejects_mismatched_content(client, register_and_verify):
@@ -157,7 +176,9 @@ def test_avatar_rejects_mismatched_content(client, register_and_verify):
     assert r.status_code == 422
 
 
-def test_coach_sets_managed_athlete_avatar_and_team_analyses(client, register_and_verify, grant_consent, upload_jump):
+def test_coach_sets_managed_athlete_avatar_and_team_analyses(
+    client, register_and_verify, grant_consent, upload_jump, fake_image_storage
+):
     coach = register_and_verify("avatar-coach@kinesiapp.com", role="coach")
     other = register_and_verify("other-coach@kinesiapp.com", role="coach")
     athlete = client.post(
@@ -166,7 +187,7 @@ def test_coach_sets_managed_athlete_avatar_and_team_analyses(client, register_an
 
     r = client.put(f"/api/v1/coach/athletes/{athlete['id']}/avatar", json=PNG_AVATAR, headers=_auth(coach))
     assert r.status_code == 200
-    assert r.json()["display_avatar"].startswith("data:image/png")
+    assert r.json()["display_avatar"] in fake_image_storage.objects
     assert client.put(
         f"/api/v1/coach/athletes/{athlete['id']}/avatar", json=PNG_AVATAR, headers=_auth(other)
     ).status_code == 404
@@ -176,3 +197,7 @@ def test_coach_sets_managed_athlete_avatar_and_team_analyses(client, register_an
     team = client.get("/api/v1/jump-analyses/team", headers=_auth(coach)).json()
     assert [item["athlete_id"] for item in team] == [athlete["id"]]
     assert client.get("/api/v1/jump-analyses/team", headers=_auth(other)).json() == []
+
+    # Borrar al deportista gestionado borra también su foto del bucket
+    assert client.delete(f"/api/v1/coach/athletes/{athlete['id']}", headers=_auth(coach)).status_code == 204
+    assert fake_image_storage.objects == {}
