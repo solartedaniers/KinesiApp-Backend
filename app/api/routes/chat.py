@@ -56,6 +56,16 @@ def list_chat_messages(
     return service.list_messages(current_user, analysis_id)
 
 
+@router.post("/{analysis_id}/chat/opening", response_model=list[ChatMessageRead])
+def start_chat(
+    analysis_id: int,
+    current_user: User = Depends(_require_chat_user),
+    service: ChatService = Depends(_get_chat_service),
+) -> list[ChatMessageRead]:
+    # Idempotente: la pantalla del análisis lo pide al mostrarse y sólo la primera vez llama a Gemini
+    return service.start_conversation(current_user, analysis_id)
+
+
 @router.post("/{analysis_id}/chat/messages", response_model=ChatMessageRead)
 def send_chat_message(
     analysis_id: int,
