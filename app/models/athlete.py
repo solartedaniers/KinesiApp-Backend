@@ -62,5 +62,10 @@ class AthleteProfile(Base):
         return self.full_name if self.is_managed else self.user.full_name
 
     @property
+    def coach_name(self) -> str | None:
+        # Entrenador responsable (lo muestra el informe en PDF); sin coach asignado, None
+        return self.coach.full_name if self.coach else None
+
+    @property
     def display_avatar(self) -> str | None:
         return self.avatar_url if self.is_managed else self.user.avatar_url

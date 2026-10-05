@@ -58,6 +58,7 @@ class AthleteProfileRead(BaseModel):
     id: int
     user_id: int | None
     coach_id: int | None
+    coach_name: str | None = None
     display_name: str
     display_avatar: str | None = None
     is_managed: bool
