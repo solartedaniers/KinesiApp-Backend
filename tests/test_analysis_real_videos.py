@@ -107,8 +107,9 @@ def test_risk_details_explain_the_bad_jump_and_squat_with_measured_values(result
 
 @pytest.mark.xfail(
     strict=True,
-    reason="Caso límite abierto: mientras YOLO pierde al atleta en el vuelo (desenfoque), el que cruza "
-    "pasa por debajo de la región sostenida, la solapa más que el umbral de IoU y se queda con el seguimiento",
+    reason="Caso límite abierto: tras el vuelo el atleta reaparece agachado y su caja ya no se solapa con la "
+    "región sostenida (se la toma por otra persona); y cuando el detector no ve a nadie en un frame se olvida "
+    "quién era el que cruza, que al agotarse el margen queda elegido como atleta. Da 2 repeticiones en vez de 4",
 )
 def test_someone_crossing_does_not_change_the_bad_jump_result(results, crossing_video):
     crossed = build_jump_video_analyzer(settings).analyze(crossing_video, MovementType.JUMP)
