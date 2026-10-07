@@ -1,17 +1,16 @@
-"""JumpAnalysisPromptBuilder: qué datos recibe Gemini, sin llamar a la red."""
+"""JumpAnalysisPromptBuilder armado desde Settings, con análisis reales pasados por el mapper del backend."""
 import json
 
-import pytest
+from kinesiapp_ai.analysis.movement_windows import DetectionMethod, MovementWindow
+from kinesiapp_ai.analysis.risk_details import RiskDetailsSerializer
+from kinesiapp_ai.chat.pattern_catalog import RiskPatternCatalog
+from kinesiapp_ai.chat.system_prompt import SYSTEM_PROMPT_TEMPLATE
 
-from app.analysis.movement_windows import DetectionMethod, MovementWindow
-from app.analysis.risk_details import RiskDetailsSerializer
-from app.chat.pattern_catalog import RiskPatternCatalog
-from app.chat.system_prompt import SYSTEM_PROMPT_TEMPLATE
 from app.core.config import settings
-from app.models.chat import ChatMessage, ChatRole
 from app.models.jump_analysis import JumpAnalysis, JumpAnalysisStatus, MovementType
 from app.models.user import UserRole
 from app.services.chat_factory import build_prompt_builder
+from app.services.chat_prompt_mapper import to_analysis_prompt_input
 from app.services.jump_video_analyzer_factory import build_jump_risk_profile, build_squat_risk_profile
 from tests.pose_fixtures import angle_series, pose_series, standing_points
 
@@ -31,7 +30,7 @@ def _analysis(movement: MovementType, profile, knee: list[float], trunk: list[fl
 
 
 def _data(analysis, audience=UserRole.COACH):
-    return build_prompt_builder(settings).analysis_data(analysis, audience)
+    return build_prompt_builder(settings).analysis_data(to_analysis_prompt_input(analysis), audience.value)
 
 
 def test_forward_collapse_sends_both_triggering_signals_with_measured_values():
@@ -87,32 +86,9 @@ def test_per_repetition_keeps_the_highest_scoring_ones_in_time_order(monkeypatch
     assert times == [round(round(frame * 1000 / 30) / 1000, 2) for frame in (1, 3)]
 
 
-def test_reduced_mode_for_analyses_without_risk_details():
-    analysis = JumpAnalysis(
-        athlete_id=1, video_reference="v.mp4", movement_type=MovementType.JUMP, status=JumpAnalysisStatus.PROCESSED,
-        risk_score=0.8, dominant_risk_pattern="rigid_landing", risk_details=None,
-    )
-    data = _data(analysis)
-    assert data["details_available"] is False
-    assert data["dominant_pattern"]["code"] == "rigid_landing"
-    assert data["dominant_pattern"]["score"] == 0.8
-    assert "signals" not in data and "per_repetition" not in data
-
-
-def test_reduced_mode_for_simulated_analyses_without_pattern():
-    analysis = JumpAnalysis(
-        athlete_id=1, video_reference="v.mp4", movement_type=MovementType.JUMP, status=JumpAnalysisStatus.PROCESSED,
-        risk_score=0.4, dominant_risk_pattern=None, risk_details=None,
-    )
-    data = _data(analysis)
-    # Con score > 0 y sin patrón no se sabe qué pasó: no se afirma que no hubo riesgo
-    assert data["dominant_pattern"] is None and "no_pattern" not in data
-    assert data["risk_level"] == "moderate"
-
-
 def test_system_prompt_is_the_design_text_with_the_data_and_no_personal_data():
     analysis = _analysis(MovementType.JUMP, build_jump_risk_profile(settings), [110], [70])
-    request = build_prompt_builder(settings).build(analysis, UserRole.COACH, [], "¿Qué corrijo?")
+    request = build_prompt_builder(settings).build(to_analysis_prompt_input(analysis), UserRole.COACH.value, [], "¿Qué corrijo?")
     prefix = SYSTEM_PROMPT_TEMPLATE.split("{analysis_json}")[0]
     assert request.system_instruction.startswith(prefix)
     payload = json.loads(request.system_instruction[len(prefix):])
@@ -124,21 +100,5 @@ def test_system_prompt_is_the_design_text_with_the_data_and_no_personal_data():
     assert [(turn.role, turn.text) for turn in request.turns] == [("user", "¿Qué corrijo?")]
 
 
-def test_history_drops_unanswered_messages_and_keeps_the_most_recent(monkeypatch):
-    monkeypatch.setattr(settings, "CHAT_HISTORY_MAX_MESSAGES", 2)
-    history = [
-        ChatMessage(role=ChatRole.USER, content="q1"),
-        ChatMessage(role=ChatRole.ASSISTANT, content="a1"),
-        ChatMessage(role=ChatRole.USER, content="sin respuesta"),
-        ChatMessage(role=ChatRole.USER, content="q2"),
-        ChatMessage(role=ChatRole.ASSISTANT, content="a2"),
-    ]
-    analysis = _analysis(MovementType.JUMP, build_jump_risk_profile(settings), [110], [70])
-    request = build_prompt_builder(settings).build(analysis, UserRole.COACH, history, "q3")
-    assert [(turn.role, turn.text) for turn in request.turns] == [("user", "q2"), ("model", "a2"), ("user", "q3")]
-
-
-def test_catalog_rejects_pattern_codes_without_text():
-    with pytest.raises(ValueError):
-        RiskPatternCatalog([{"new_pattern": ["knee_rigid"]}])
+def test_every_configured_risk_code_has_chat_text():
     RiskPatternCatalog([settings.RISK_JUMP_PATTERNS, settings.RISK_SQUAT_PATTERNS])

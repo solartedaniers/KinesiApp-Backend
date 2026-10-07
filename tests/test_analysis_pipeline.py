@@ -4,13 +4,14 @@ from pathlib import Path
 
 import pytest
 
-from app.analysis.angles import AngleCalculator
-from app.analysis.errors import NoMovementDetectedError, UnreadableVideoError
-from app.analysis.pose_extraction import VideoPoseExtractor
-from app.analysis.pose_series import PoseSeries
-from app.analysis.preprocessing import LandmarkSeriesPreprocessor
-from app.analysis.risk_details import RiskDetailsSerializer
-from app.analysis.video_reader import VideoFrameReader
+from kinesiapp_ai.analysis.angles import AngleCalculator
+from kinesiapp_ai.analysis.errors import NoMovementDetectedError, UnreadableVideoError
+from kinesiapp_ai.analysis.pose_extraction import VideoPoseExtractor
+from kinesiapp_ai.analysis.pose_series import PoseSeries
+from kinesiapp_ai.analysis.preprocessing import LandmarkSeriesPreprocessor
+from kinesiapp_ai.analysis.risk_details import RiskDetailsSerializer
+from kinesiapp_ai.analysis.video_reader import VideoFrameReader
+
 from app.core.config import settings
 from app.models.jump_analysis import JumpAnalysis, JumpAnalysisStatus, MovementType
 from app.services.jump_analysis_processor import (

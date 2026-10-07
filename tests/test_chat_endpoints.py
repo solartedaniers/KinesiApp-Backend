@@ -1,5 +1,6 @@
 """Endpoints de chat con un LlmClient falso (conftest.fake_llm): nunca se llama a Gemini."""
-from app.chat.llm import LlmUnavailableError
+from kinesiapp_ai.chat.llm import LlmUnavailableError
+
 from app.core.config import settings
 from app.models.chat import ChatConversation
 from app.models.jump_analysis import JumpAnalysis, JumpAnalysisStatus

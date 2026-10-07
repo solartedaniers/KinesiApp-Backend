@@ -4,8 +4,9 @@ import math
 from io import BytesIO
 from pathlib import Path
 
-from app.analysis.movement_windows import DetectionMethod, MovementWindow
-from app.analysis.risk_details import RISK_DETAILS_FORMAT_VERSION, RiskDetailsSerializer
+from kinesiapp_ai.analysis.movement_windows import DetectionMethod, MovementWindow
+from kinesiapp_ai.analysis.risk_details import RISK_DETAILS_FORMAT_VERSION, RiskDetailsSerializer
+
 from app.core.config import settings
 from app.models.jump_analysis import JumpAnalysis, JumpAnalysisStatus, MovementType
 from app.services.jump_analysis_processor import JumpAnalysisProcessor

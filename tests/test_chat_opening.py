@@ -1,6 +1,7 @@
 """Primer mensaje automático del chat: la explicación del resultado apenas el análisis está listo."""
-from app.chat.llm import LlmUnavailableError
-from app.chat.system_prompt import OPENING_REQUEST
+from kinesiapp_ai.chat.llm import LlmUnavailableError
+from kinesiapp_ai.chat.system_prompt import OPENING_REQUEST
+
 from app.models.jump_analysis import JumpAnalysis, JumpAnalysisStatus
 from app.models.user import UserRole
 from tests.test_chat_endpoints import _processed_analysis, _send
