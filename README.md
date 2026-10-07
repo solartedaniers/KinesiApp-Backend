@@ -11,8 +11,9 @@ Startup order matters: the schema must be migrated before the app (or the admin 
 # Also installs the AI package (kinesiapp-ai) from github.com/solartedaniers/KinesiApp_IA
 pip install -r requirements-dev.txt
 
-# 0. Download the pose model (the Docker image does this at build time, pinned by checksum)
+# 0. Download the pose and person-detection models (the Docker image does this at build time, pinned by checksum)
 curl -L -o models/pose_landmarker_full.task   https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task
+curl -L -o models/yolo11n.onnx   https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n.onnx
 
 # 1. Point the root .env at Neon (no local Postgres anymore): POSTGRES_HOST/PORT/USER/PASSWORD/DB
 #    from Neon's DIRECT connection string (host without "-pooler"), see .env.example.

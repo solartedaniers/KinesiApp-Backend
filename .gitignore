@@ -9,5 +9,6 @@ venv/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
-# Modelo de pose de MediaPipe: se descarga (ver README.md)
+# Modelos de pose (MediaPipe) y de detección de personas (YOLO): se descargan (ver README.md)
 models/*.task
+models/*.onnx
