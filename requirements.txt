@@ -10,11 +10,9 @@ pydantic[email]>=2.12.5,<3.0.0
 passlib==1.7.4
 bcrypt==4.0.1
 PyJWT==2.10.1
-# Paquete de IA (../ai, kinesiapp-ai): análisis de pose con MediaPipe, riesgo y chat con Gemini.
-# Trae fijadas sus propias dependencias (mediapipe, opencv, numpy, scipy, google-genai, httpx).
-# Ruta relativa al directorio desde donde corre pip (backend/ en local, /app en la imagen Docker).
-# Cuando exista su repo propio se reemplaza por kinesiapp-ai @ git+https://...@v0.1.0
--e ../ai
+# Paquete de IA (repo KinesiApp_IA, kinesiapp-ai): análisis de pose con MediaPipe, riesgo y chat
+# con Gemini. Trae fijadas sus propias dependencias (mediapipe, opencv, numpy, scipy, google-genai, httpx)
+kinesiapp-ai @ git+https://github.com/solartedaniers/KinesiApp_IA.git@main
 # Almacenamiento de objetos S3 de Neon (app/storage)
 boto3==1.43.108
 # app/storage/neon_object_storage.py lo importa directo (Config y errores): no depender de que llegue transitivo
