@@ -3,3 +3,11 @@ __pycache__/
 .env
 .venv/
 venv/
+# Antes las cubría el .gitignore de la raíz del monorepo
+.env.*
+!.env.example
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+# Modelo de pose de MediaPipe: se descarga (ver README.md)
+models/*.task
