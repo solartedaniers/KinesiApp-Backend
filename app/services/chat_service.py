@@ -1,13 +1,15 @@
 import logging
 
-from app.chat.llm import LlmClient, LlmRequest, LlmUnavailableError
-from app.chat.prompt_builder import JumpAnalysisPromptBuilder
+from kinesiapp_ai.chat.llm import LlmClient, LlmRequest, LlmUnavailableError
+from kinesiapp_ai.chat.prompt_builder import JumpAnalysisPromptBuilder
+
 from app.chat.rate_limiter import ChatRateLimitedError, ChatRateLimiter
 from app.core.exceptions import ConflictException, ErrorCode, ServiceUnavailableException, TooManyRequestsException
 from app.models.chat import ChatMessage, ChatRole
 from app.models.jump_analysis import JumpAnalysis, JumpAnalysisStatus
 from app.models.user import User
 from app.repositories.chat_repository import ChatConversationRepository, ChatMessageRepository
+from app.services.chat_prompt_mapper import to_analysis_prompt_input, to_history_messages
 from app.services.jump_analysis_service import JumpAnalysisService
 
 logger = logging.getLogger(__name__)
@@ -55,7 +57,8 @@ class ChatService:
         if existing:
             return existing
         self._check_rate_limit(conversation.id)
-        reply = self._generate(self._prompt_builder.build_opening(analysis, current_user.role), analysis_id)
+        request = self._prompt_builder.build_opening(to_analysis_prompt_input(analysis), current_user.role.value)
+        reply = self._generate(request, analysis_id)
         # Mientras se esperaba al proveedor, otra pestaña del mismo usuario pudo abrir el hilo
         existing = self._messages.list_by_conversation(conversation.id)
         if existing:
@@ -70,7 +73,9 @@ class ChatService:
         history = self._messages.list_by_conversation(conversation.id)
         # Se guarda antes de llamar al proveedor: cuenta para el rate limit aunque la llamada falle
         self._messages.add(ChatMessage(conversation_id=conversation.id, role=ChatRole.USER, content=content))
-        request = self._prompt_builder.build(analysis, current_user.role, history, content)
+        request = self._prompt_builder.build(
+            to_analysis_prompt_input(analysis), current_user.role.value, to_history_messages(history), content
+        )
         return self._add_reply(conversation.id, self._generate(request, analysis_id))
 
     def _processed_analysis(self, current_user: User, analysis_id: int) -> JumpAnalysis:
