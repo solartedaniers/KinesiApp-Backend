@@ -1,9 +1,10 @@
 from functools import lru_cache
 
-from app.chat.gemini_client import GeminiLlmClient
-from app.chat.llm import LlmClient, UnconfiguredLlmClient
-from app.chat.pattern_catalog import RiskPatternCatalog
-from app.chat.prompt_builder import JumpAnalysisPromptBuilder
+from kinesiapp_ai.chat.gemini_client import GeminiLlmClient
+from kinesiapp_ai.chat.llm import LlmClient, UnconfiguredLlmClient
+from kinesiapp_ai.chat.pattern_catalog import RiskPatternCatalog
+from kinesiapp_ai.chat.prompt_builder import JumpAnalysisPromptBuilder
+
 from app.core.config import Settings, settings
 
 

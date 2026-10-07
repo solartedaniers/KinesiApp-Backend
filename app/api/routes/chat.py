@@ -3,11 +3,12 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from kinesiapp_ai.chat.llm import LlmClient
+from kinesiapp_ai.chat.prompt_builder import JumpAnalysisPromptBuilder
+from kinesiapp_ai.chat.system_prompt import SYSTEM_PROMPT_VERSION
+
 from app.api.routes.jump_analyses import get_jump_analysis_service
-from app.chat.llm import LlmClient
-from app.chat.prompt_builder import JumpAnalysisPromptBuilder
 from app.chat.rate_limiter import ChatRateLimiter
-from app.chat.system_prompt import SYSTEM_PROMPT_VERSION
 from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import require_roles

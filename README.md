@@ -8,6 +8,7 @@ The schema is managed by Alembic — the app never creates tables itself.
 Startup order matters: the schema must be migrated before the app (or the admin CLI) touches the database.
 
 ```bash
+# From backend/: also installs the AI package (../ai, kinesiapp-ai) in editable mode
 pip install -r requirements-dev.txt
 
 # 0. Download the pose model (the Docker image does this at build time, pinned by checksum)

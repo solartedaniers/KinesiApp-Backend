@@ -5,14 +5,15 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session, sessionmaker
 
-from app.analysis.angles import AngleCalculator, AngleSeries
-from app.analysis.errors import NoMovementDetectedError, VideoAnalysisError
-from app.analysis.movement_windows import MovementWindowDetector
-from app.analysis.pose_extraction import VideoPoseExtractor
-from app.analysis.pose_series import PoseSeries
-from app.analysis.preprocessing import LandmarkSeriesPreprocessor
-from app.analysis.risk import RiskScoreAggregator
-from app.analysis.risk_details import RiskDetailsSerializer
+from kinesiapp_ai.analysis.angles import AngleCalculator, AngleSeries
+from kinesiapp_ai.analysis.errors import NoMovementDetectedError, VideoAnalysisError
+from kinesiapp_ai.analysis.movement_windows import MovementWindowDetector
+from kinesiapp_ai.analysis.pose_extraction import VideoPoseExtractor
+from kinesiapp_ai.analysis.pose_series import PoseSeries
+from kinesiapp_ai.analysis.preprocessing import LandmarkSeriesPreprocessor
+from kinesiapp_ai.analysis.risk import RiskScoreAggregator
+from kinesiapp_ai.analysis.risk_details import RiskDetailsSerializer
+
 from app.models.jump_analysis import JumpAnalysisStatus, MovementType
 from app.repositories.jump_analysis_repository import JumpAnalysisRepository
 from app.schemas.jump_analysis import JointAngleMeasurementCreate, JumpAnalysisResultIngest

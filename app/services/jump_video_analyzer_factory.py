@@ -1,15 +1,16 @@
 from functools import lru_cache, partial
 
-from app.analysis.angles import AngleCalculator
-from app.analysis.jump_phases import JumpPhaseDetector
-from app.analysis.pose_estimator import MediaPipePoseEstimator
-from app.analysis.pose_extraction import VideoPoseExtractor
-from app.analysis.preprocessing import LandmarkSeriesPreprocessor
-from app.analysis.risk import KneeFlexionRiskStrategy, LinearRamp, RiskScoreAggregator, TrunkFlexionRiskStrategy
-from app.analysis.risk_details import RiskDetailsSerializer
-from app.analysis.squat_phases import SquatBottomDetector
-from app.analysis.trunk_hinge import FallbackWindowDetector, TrunkHingeDetector
-from app.analysis.video_reader import VideoFrameReader
+from kinesiapp_ai.analysis.angles import AngleCalculator
+from kinesiapp_ai.analysis.jump_phases import JumpPhaseDetector
+from kinesiapp_ai.analysis.pose_estimator import MediaPipePoseEstimator
+from kinesiapp_ai.analysis.pose_extraction import VideoPoseExtractor
+from kinesiapp_ai.analysis.preprocessing import LandmarkSeriesPreprocessor
+from kinesiapp_ai.analysis.risk import KneeFlexionRiskStrategy, LinearRamp, RiskScoreAggregator, TrunkFlexionRiskStrategy
+from kinesiapp_ai.analysis.risk_details import RiskDetailsSerializer
+from kinesiapp_ai.analysis.squat_phases import SquatBottomDetector
+from kinesiapp_ai.analysis.trunk_hinge import FallbackWindowDetector, TrunkHingeDetector
+from kinesiapp_ai.analysis.video_reader import VideoFrameReader
+
 from app.core.config import Settings, settings
 from app.models.jump_analysis import MovementType
 from app.services.jump_analysis_processor import JumpVideoAnalyzer, MovementRiskProfile
