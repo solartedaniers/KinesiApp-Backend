@@ -81,6 +81,12 @@ class Settings(BaseSettings):
     PERSON_DETECTOR_MIN_CONFIDENCE: float = Field(default=0.5, ge=0, le=1)
     PERSON_CROP_MARGIN: float = Field(default=0.25, ge=0)
     PERSON_MIN_RELATIVE_AREA: float = Field(default=0.25, ge=0, le=1)
+    # Seguimiento del atleta una vez que alguien compitió con él. En los videos de prueba su caja se
+    # solapa al menos 0.24 con la anterior aun después de un hueco, y el detector lo pierde hasta 7
+    # frames seguidos en el vuelo por el desenfoque
+    PERSON_TRACK_MIN_IOU: float = Field(default=0.2, gt=0, le=1)
+    PERSON_TRACK_MAX_MISSED_FRAMES: int = Field(default=15, ge=0)
+    PERSON_TRACK_SMOOTHING: float = Field(default=0.5, gt=0, le=1)
     LANDMARK_VISIBILITY_THRESHOLD: float = Field(default=0.1, ge=0, le=1)
     LANDMARK_SMOOTHING_WINDOW_FRAMES: int = Field(default=3, ge=1)
 
