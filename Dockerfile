@@ -6,7 +6,11 @@ WORKDIR /app
 # Bibliotecas nativas que cargan opencv y el binario de mediapipe aunque no haya pantalla ni GPU
 RUN apt-get update && apt-get install -y --no-install-recommends     libgl1 libglib2.0-0 libegl1 libgles2     && rm -rf /var/lib/apt/lists/*
 
-# Capa de dependencias separada del código para aprovechar la cache de Docker
+# Capa de dependencias separada del código para aprovechar la cache de Docker.
+# El paquete de IA vive fuera de este contexto: se pasa como contexto de build "ai"
+# (docker build --build-context ai=../ai backend, o additional_contexts en docker-compose).
+# Va a /ai porque requirements.txt lo pide como ../ai desde /app
+COPY --from=ai . /ai
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
