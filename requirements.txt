@@ -11,8 +11,9 @@ passlib==1.7.4
 bcrypt==4.0.1
 PyJWT==2.10.1
 # Paquete de IA (repo KinesiApp_IA, kinesiapp-ai): análisis de pose con MediaPipe, riesgo y chat
-# con Gemini. Trae fijadas sus propias dependencias (mediapipe, opencv, numpy, scipy, google-genai, httpx)
-kinesiapp-ai @ git+https://github.com/solartedaniers/KinesiApp_IA.git@main
+# con Gemini, y detección de personas con YOLO. Fijado a un tag de versión, no a main. Trae fijadas sus
+# propias dependencias (mediapipe, opencv, numpy, scipy, google-genai, httpx, onnxruntime)
+kinesiapp-ai @ git+https://github.com/solartedaniers/KinesiApp_IA.git@v0.2.0
 # Almacenamiento de objetos S3 de Neon (app/storage)
 boto3==1.43.108
 # app/storage/neon_object_storage.py lo importa directo (Config y errores): no depender de que llegue transitivo
