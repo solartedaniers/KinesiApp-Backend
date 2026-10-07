@@ -2,8 +2,9 @@ from functools import lru_cache, partial
 
 from kinesiapp_ai.analysis.angles import AngleCalculator
 from kinesiapp_ai.analysis.jump_phases import JumpPhaseDetector
+from kinesiapp_ai.analysis.person_detection import YoloPersonDetector
 from kinesiapp_ai.analysis.pose_estimator import MediaPipePoseEstimator
-from kinesiapp_ai.analysis.pose_extraction import VideoPoseExtractor
+from kinesiapp_ai.analysis.pose_extraction import MainPersonCropper, VideoPoseExtractor
 from kinesiapp_ai.analysis.preprocessing import LandmarkSeriesPreprocessor
 from kinesiapp_ai.analysis.risk import KneeFlexionRiskStrategy, LinearRamp, RiskScoreAggregator, TrunkFlexionRiskStrategy
 from kinesiapp_ai.analysis.risk_details import RiskDetailsSerializer
@@ -21,6 +22,11 @@ def build_jump_video_analyzer(config: Settings) -> JumpVideoAnalyzer:
         pose_extractor=VideoPoseExtractor(
             VideoFrameReader(),
             partial(MediaPipePoseEstimator, config.POSE_MODEL_PATH, config.POSE_MIN_DETECTION_CONFIDENCE),
+            MainPersonCropper(
+                YoloPersonDetector(config.PERSON_DETECTOR_MODEL_PATH, config.PERSON_DETECTOR_MIN_CONFIDENCE),
+                margin=config.PERSON_CROP_MARGIN,
+                min_relative_area=config.PERSON_MIN_RELATIVE_AREA,
+            ),
         ),
         preprocessor=LandmarkSeriesPreprocessor(
             config.LANDMARK_VISIBILITY_THRESHOLD, config.LANDMARK_SMOOTHING_WINDOW_FRAMES

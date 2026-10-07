@@ -1,6 +1,6 @@
 """Pipeline completo, con MediaPipe real, sobre los videos propios del spike.
 
-Los videos y el modelo no se versionan (spikes/pose_spike/videos/, models/): sin ellos estos
+Los videos y los modelos no se versionan (spikes/pose_spike/videos/, models/): sin ellos estos
 tests se saltan. Los nombres de archivo son la verdad: "bien" es la técnica correcta y "mal" la
 incorrecta. También comprueban que dos corridas sobre el mismo video dan exactamente lo mismo.
 """
@@ -22,8 +22,10 @@ VIDEOS = {
 LOW_RISK = 0.33
 
 pytestmark = pytest.mark.skipif(
-    not settings.POSE_MODEL_PATH.is_file() or not all((VIDEOS_DIR / name).is_file() for name in VIDEOS),
-    reason="Pose model or spike videos not available locally",
+    not settings.POSE_MODEL_PATH.is_file()
+    or not settings.PERSON_DETECTOR_MODEL_PATH.is_file()
+    or not all((VIDEOS_DIR / name).is_file() for name in VIDEOS),
+    reason="Pose or person-detection model, or spike videos, not available locally",
 )
 
 

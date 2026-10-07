@@ -74,6 +74,13 @@ class Settings(BaseSettings):
     POSE_MODEL_PATH: Path = Path(__file__).resolve().parents[2] / "models" / "pose_landmarker_full.task"
     POSE_MODEL_VERSION: str = "mediapipe-pose_landmarker_full-float16-v1"
     POSE_MIN_DETECTION_CONFIDENCE: float = Field(default=0.5, ge=0, le=1)
+    # Detector de personas: si otra persona compite con el atleta, MediaPipe solo ve el recorte del
+    # atleta (el más grande y centrado) con este margen por lado. Cajas por debajo del área relativa
+    # a la mayor no compiten: el reflejo en el espejo de los videos de prueba ocupa hasta 0.19
+    PERSON_DETECTOR_MODEL_PATH: Path = Path(__file__).resolve().parents[2] / "models" / "yolo11n.onnx"
+    PERSON_DETECTOR_MIN_CONFIDENCE: float = Field(default=0.5, ge=0, le=1)
+    PERSON_CROP_MARGIN: float = Field(default=0.25, ge=0)
+    PERSON_MIN_RELATIVE_AREA: float = Field(default=0.25, ge=0, le=1)
     LANDMARK_VISIBILITY_THRESHOLD: float = Field(default=0.1, ge=0, le=1)
     LANDMARK_SMOOTHING_WINDOW_FRAMES: int = Field(default=3, ge=1)
 
