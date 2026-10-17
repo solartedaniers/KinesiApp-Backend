@@ -6,3 +6,5 @@ venv
 # El modelo se descarga en el build; el spike trae videos y su propio venv
 models
 spikes
+# Lo genera el build de Docker
+generated
