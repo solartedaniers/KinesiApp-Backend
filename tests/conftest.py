@@ -36,7 +36,7 @@ from app.main import app
 from app.models.user import User, UserRole
 from app.schemas.jump_analysis import JointAngleMeasurementCreate, JumpAnalysisResultIngest
 from app.services.chat_factory import get_llm_client
-from app.services.email_domain_checker import get_email_domain_checker
+from app.services.email_factory import get_email_domain_checker
 from app.services.email_factory import get_email_sender
 from app.services.jump_video_analyzer_factory import get_jump_video_analyzer
 from app.services.jump_video_storage import JumpVideoStorage

@@ -20,8 +20,8 @@ from app.schemas.user import UserCreate, UserRead
 from app.mail.auth_email_service import AuthEmailService
 from app.mail.email_sender import EmailDeliveryError
 from app.services.auth_service import AuthService
-from app.services.email_domain_checker import EmailDomainChecker, get_email_domain_checker
-from app.services.email_factory import get_auth_email_service
+from app.services.email_domain_checker import EmailDomainChecker
+from app.services.email_factory import get_auth_email_service, get_email_domain_checker
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

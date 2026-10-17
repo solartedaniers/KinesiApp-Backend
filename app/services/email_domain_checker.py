@@ -6,8 +6,6 @@ from email_validator import validate_email
 from email_validator.deliverability import validate_email_deliverability
 from email_validator.exceptions import EmailUndeliverableError
 
-from app.core.config import settings
-
 logger = logging.getLogger(__name__)
 
 # Respuestas DNS definitivas: el dominio no existe o no tiene dónde recibir correo
@@ -47,7 +45,3 @@ class EmailDomainChecker:
                 info["unknown-deliverability"],
             )
         return True
-
-
-def get_email_domain_checker() -> EmailDomainChecker:
-    return EmailDomainChecker(settings.EMAIL_DNS_TIMEOUT_SECONDS)
