@@ -4,7 +4,7 @@ from datetime import date
 from sqlalchemy import CheckConstraint, Date, Enum, Float, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from app.models.base import Base
 
 
 class Gender(str, enum.Enum):
