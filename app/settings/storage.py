@@ -21,6 +21,8 @@ class MediaSettings(EnvSettings):
     """Límites y permisos de los videos y avatares que suben las personas."""
 
     MAX_VIDEO_UPLOAD_BYTES: int = Field(default=100 * 1024 * 1024, gt=0)
+    # El cliente lo valida leyendo los metadatos del video antes de subirlo
+    MAX_VIDEO_DURATION_SECONDS: int = Field(default=40, gt=0)
     # El cliente ya la redimensiona y comprime en un Web Worker antes de enviarla
     MAX_AVATAR_UPLOAD_BYTES: int = Field(default=1_000_000, gt=0)
     # Versión vigente del texto de consentimiento de video: subir exige haber aceptado esta
