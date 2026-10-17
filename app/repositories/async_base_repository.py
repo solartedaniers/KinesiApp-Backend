@@ -16,3 +16,7 @@ class AsyncBaseRepository(Generic[ModelType]):
 
     async def get(self, entity_id: int) -> ModelType | None:
         return await self._session.get(self._model, entity_id)
+
+    def add(self, entity: ModelType) -> None:
+        # Sin commit: lo hace la unidad de trabajo, para que un caso de uso confirme todo o nada
+        self._session.add(entity)
