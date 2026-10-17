@@ -1,0 +1,32 @@
+from dataclasses import dataclass
+from functools import lru_cache
+
+from google.protobuf import descriptor_pool
+from kinesiapp.common.v1 import identity_pb2
+
+from app.models.user import UserRole
+
+_ROLE_PREFIX = "USER_ROLE_"
+
+
+@dataclass(frozen=True)
+class MethodAccess:
+    public: bool
+    # Vacío: cualquier rol con sesión iniciada
+    roles: frozenset[UserRole]
+
+
+@lru_cache
+def access_for(method: str) -> MethodAccess:
+    """Lee la opción (kinesiapp.common.v1.access) del RPC. method llega como "/paquete.Servicio/Metodo"."""
+    full_name = method.lstrip("/").replace("/", ".")
+    try:
+        options = descriptor_pool.Default().FindMethodByName(full_name).GetOptions()
+    except KeyError:
+        # Un método fuera del contrato nunca es público por omisión
+        return MethodAccess(public=False, roles=frozenset())
+    if not options.HasExtension(identity_pb2.access):
+        return MethodAccess(public=False, roles=frozenset())
+    policy = options.Extensions[identity_pb2.access]
+    roles = frozenset(UserRole[identity_pb2.UserRole.Name(role).removeprefix(_ROLE_PREFIX)] for role in policy.roles)
+    return MethodAccess(public=policy.public, roles=roles)
