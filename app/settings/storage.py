@@ -35,6 +35,9 @@ class MediaSettings(EnvSettings):
     VIDEO_UPLOAD_TOKEN_EXPIRE_MINUTES: int = Field(default=30, gt=0)
     # Vida de la URL firmada con la que el navegador sube directo al bucket: debe cubrir la subida más lenta
     SIGNED_UPLOAD_URL_EXPIRE_SECONDS: int = Field(default=900, gt=0, le=7 * 24 * 3600)
+    # Vida del upload_id con el que se confirma la subida: más larga que la URL, porque la subida empieza
+    # antes de que la URL venza pero puede terminar después
+    UPLOAD_TICKET_EXPIRE_SECONDS: int = Field(default=3600, gt=0)
     # Vida de la URL firmada para ver un archivo privado; el cliente pide otra al vencer
     SIGNED_READ_URL_EXPIRE_SECONDS: int = Field(default=300, gt=0, le=7 * 24 * 3600)
     # Clave del proceso interno que reporta resultados por REST. Sin definir, ese endpoint rechaza toda llamada
