@@ -15,6 +15,7 @@ from app.account.inputs import AccountInputRules
 from app.account.video_consent import VideoConsent
 from app.models.user import UserRole
 from app.rpc.account_servicer import AccountServicer
+from app.storage.avatar_files import AvatarFiles
 from app.storage.avatar_links import AvatarLinks
 from app.storage.upload_tickets import UploadTicketService
 from tests.grpc_harness import error_info
@@ -33,7 +34,7 @@ def _run(tmp_path: Path, scenario, bucket: FakeBucket | None = None):
         servicer = AccountServicer(
             AccountInputRules(MAX_AVATAR_BYTES),
             AccountProfile(uows),
-            AvatarManagement(uows, bucket, UploadTicketService(AUTH_SETTINGS, 60), MAX_AVATAR_BYTES),
+            AvatarManagement(uows, AvatarFiles(bucket, UploadTicketService(AUTH_SETTINGS, 60), MAX_AVATAR_BYTES)),
             VideoConsent(uows, CONSENT_VERSION),
             AvatarLinks(bucket),
         )

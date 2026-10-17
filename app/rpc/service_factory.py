@@ -48,6 +48,7 @@ from app.settings.chat import ChatSettings
 from app.settings.mail import MailSettings
 from app.settings.pagination import PaginationSettings
 from app.settings.storage import MediaSettings, StorageSettings
+from app.storage.avatar_files import AvatarFiles
 from app.storage.avatar_links import AvatarLinks
 from app.storage.signed_storage_factory import build_signed_storage
 from app.storage.upload_tickets import UploadTicketService
@@ -73,6 +74,8 @@ class RpcServiceFactory:
         storage = StorageSettings()
         self._images = build_signed_storage(storage, self._media_settings, storage.S3_PRIVATE_IMAGES_BUCKET)
         self._avatar_links = AvatarLinks(self._images)
+        tickets = UploadTicketService(auth_settings, self._media_settings.UPLOAD_TICKET_EXPIRE_SECONDS)
+        self._avatar_files = AvatarFiles(self._images, tickets, self._media_settings.MAX_AVATAR_UPLOAD_BYTES)
 
     def registrations(self) -> list[ServicerRegistration]:
         return [
@@ -113,11 +116,10 @@ class RpcServiceFactory:
 
     def _account(self) -> AccountServicer:
         media = self._media_settings
-        tickets = UploadTicketService(self._auth_settings, media.UPLOAD_TICKET_EXPIRE_SECONDS)
         return AccountServicer(
             AccountInputRules(media.MAX_AVATAR_UPLOAD_BYTES),
             AccountProfile(self._uow_factory),
-            AvatarManagement(self._uow_factory, self._images, tickets, media.MAX_AVATAR_UPLOAD_BYTES),
+            AvatarManagement(self._uow_factory, self._avatar_files),
             VideoConsent(self._uow_factory, media.VIDEO_CONSENT_VERSION),
             self._avatar_links,
         )
