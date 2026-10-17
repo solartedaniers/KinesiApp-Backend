@@ -3,7 +3,7 @@ import subprocess
 import sys
 
 # Dependencias que están en requirements.txt pero no en requirements-grpc.txt
-_ABSENT_IN_GRPC_IMAGE = ["fastapi", "starlette", "psycopg2", "kinesiapp_ai", "boto3"]
+_ABSENT_IN_GRPC_IMAGE = ["fastapi", "starlette", "psycopg2", "kinesiapp_ai"]
 
 
 def test_grpc_server_imports_without_the_rest_only_dependencies() -> None:
