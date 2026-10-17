@@ -20,3 +20,7 @@ class AsyncBaseRepository(Generic[ModelType]):
     def add(self, entity: ModelType) -> None:
         # Sin commit: lo hace la unidad de trabajo, para que un caso de uso confirme todo o nada
         self._session.add(entity)
+
+    async def refresh(self, entity: ModelType) -> None:
+        # Trae lo que pone la base (id, created_at) antes de que la unidad de trabajo suelte la instancia
+        await self._session.refresh(entity)
