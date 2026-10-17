@@ -246,6 +246,25 @@ def test_wrong_codes_count_until_the_code_is_no_longer_usable(tmp_path: Path) ->
     assert attempts == 5
 
 
+def test_concurrent_wrong_codes_never_exceed_the_attempt_limit(tmp_path: Path) -> None:
+    async def scenario(backend: _Backend) -> tuple[list[str], int, str]:
+        await backend.stub.Register(_register_request())
+        good = backend.mailbox.verification[EMAIL]
+        wrong = "000000" if good != "000000" else "111111"
+        errors = await asyncio.gather(
+            *(_error_of(backend.stub.VerifyEmail(auth_pb2.VerifyEmailRequest(email=EMAIL, code=wrong))) for _ in range(12))
+        )
+        late = await _error_of(backend.stub.VerifyEmail(auth_pb2.VerifyEmailRequest(email=EMAIL, code=good)))
+        attempts = (await backend.user()).verification_code_attempts
+        return [error_info(e).reason for e in errors], attempts, error_info(late).reason
+
+    reasons, attempts, late = _run(tmp_path, scenario)
+
+    assert reasons == ["INVALID_OTP"] * 12
+    assert attempts == 5
+    assert late == "INVALID_OTP"
+
+
 def test_refresh_rotates_the_token_and_logout_is_idempotent(tmp_path: Path) -> None:
     async def scenario(backend: _Backend) -> list[str]:
         first = await backend.registered_and_verified()

@@ -37,13 +37,14 @@ class OneTimeCodes:
     async def check(self, uow: UnitOfWork, user: User, purpose: CodePurpose, code: str) -> None:
         code_hash: str | None = getattr(user, f"{purpose.value}_hash")
         expires_at: datetime | None = getattr(user, f"{purpose.value}_expires_at")
-        attempts: int = getattr(user, f"{purpose.value}_attempts")
-        if code_hash is None or expires_at is None or is_expired(expires_at) or attempts >= self._max_attempts:
+        if code_hash is None or expires_at is None or is_expired(expires_at):
             raise _invalid_code()
+        # Gasto el intento y lo confirmo antes de comparar el hash: así, aunque lleguen peticiones simultáneas,
+        # nunca se comparan más códigos que el máximo
+        if not await uow.users.take_code_attempt(user.id, f"{purpose.value}_attempts", self._max_attempts):
+            raise _invalid_code()
+        await uow.commit()
         if not await self._hasher.verify(code, code_hash):
-            # Confirmo el intento fallido antes de responder: si no, probar códigos no tendría límite
-            setattr(user, f"{purpose.value}_attempts", attempts + 1)
-            await uow.commit()
             raise _invalid_code()
 
     def clear(self, user: User, purpose: CodePurpose) -> None:

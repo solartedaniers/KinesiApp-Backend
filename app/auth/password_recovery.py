@@ -36,7 +36,7 @@ class PasswordRecovery:
         await self._mailer.send_password_reset_code(email, code)
 
     async def verify_code(self, email: str, code: str) -> None:
-        # Valido sin consumir el código, pero cuento los intentos fallidos
+        # Valido sin consumir el código, pero la comprobación gasta un intento
         async with self._uow_factory() as uow:
             await self._codes.check(uow, await _existing_user(uow, email), CodePurpose.PASSWORD_RESET, code)
 
