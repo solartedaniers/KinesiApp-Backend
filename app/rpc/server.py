@@ -13,7 +13,7 @@ from app.identity.access_tokens import AccessTokenVerifier, JwtAccessTokenVerifi
 from app.rpc.interceptors.auth import AuthInterceptor
 from app.rpc.interceptors.errors import ErrorInterceptor
 from app.rpc.interceptors.logging import LoggingInterceptor
-from app.rpc.service_factory import Registration, RpcServiceFactory
+from app.rpc.service_factory import RpcServiceFactory, ServicerRegistration
 from app.settings.auth import AuthSettings
 from app.settings.database import DatabaseSettings
 from app.settings.grpc import GrpcServerSettings
@@ -29,7 +29,7 @@ def build_interceptors(verifier: AccessTokenVerifier) -> list[grpc.aio.ServerInt
 def build_server(
     settings: GrpcServerSettings,
     interceptors: Sequence[grpc.aio.ServerInterceptor],
-    registrations: Sequence[Registration],
+    registrations: Sequence[ServicerRegistration],
 ) -> grpc.aio.Server:
     server = grpc.aio.server(interceptors=list(interceptors))
     for register in registrations:
@@ -42,7 +42,8 @@ async def serve(settings: GrpcServerSettings, auth_settings: AuthSettings, datab
     engine = build_async_engine(database_settings)
     session_factory = build_session_factory(engine)
     verifier = JwtAccessTokenVerifier(auth_settings, session_factory)
-    server = build_server(settings, build_interceptors(verifier), RpcServiceFactory().registrations())
+    registrations = RpcServiceFactory(session_factory, auth_settings).registrations()
+    server = build_server(settings, build_interceptors(verifier), registrations)
     await server.start()
     logger.info("gRPC server listening on %s:%s", settings.HOST, settings.PORT)
 
