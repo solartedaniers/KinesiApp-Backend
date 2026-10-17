@@ -57,7 +57,7 @@ def hash_token(raw_token: str) -> str:
 def _create_token(subject: str, token_type: TokenType, expires_delta: timedelta) -> str:
     now = datetime.now(timezone.utc)
     payload = {"sub": subject, "type": token_type, "iat": now, "exp": now + expires_delta}
-    return jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    return jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
 
 
 def create_access_token(user_id: int) -> str:
@@ -78,7 +78,7 @@ def create_refresh_token(user_id: int) -> tuple[str, datetime]:
         "exp": expires_at,
         "jti": secrets.token_hex(16),
     }
-    token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    token = jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
     return token, expires_at
 
 
@@ -87,7 +87,7 @@ def create_video_access_token(analysis_id: int) -> tuple[str, datetime]:
     # lo rechaza como access token) y el sub es el análisis, no un usuario
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.VIDEO_ACCESS_TOKEN_EXPIRE_MINUTES)
     payload = {"sub": str(analysis_id), "type": "video", "exp": expires_at}
-    token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    token = jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
     return token, expires_at
 
 
@@ -96,7 +96,7 @@ def create_video_upload_token(user_id: int, athlete_id: int) -> tuple[str, datet
     # así que si se filtra no abre ninguna otra operación de la cuenta
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.VIDEO_UPLOAD_TOKEN_EXPIRE_MINUTES)
     payload = {"sub": str(user_id), "type": "upload", "athlete_id": athlete_id, "exp": expires_at}
-    token = jwt.encode(payload, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    token = jwt.encode(payload, settings.JWT_SECRET_KEY.get_secret_value(), algorithm=settings.JWT_ALGORITHM)
     return token, expires_at
 
 
@@ -107,7 +107,7 @@ def verify_video_access_token(token: str, analysis_id: int) -> None:
 
 def decode_token(token: str, expected_type: TokenType) -> dict:
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY.get_secret_value(), algorithms=[settings.JWT_ALGORITHM])
     except jwt.PyJWTError as exc:
         raise UnauthorizedException("Invalid or expired token") from exc
 
@@ -142,7 +142,7 @@ def get_uploader(
 ) -> Uploader:
     # Acepta el access token de siempre (BFF, tests) o un token de subida (navegador)
     try:
-        payload = jwt.decode(credentials.credentials, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(credentials.credentials, settings.JWT_SECRET_KEY.get_secret_value(), algorithms=[settings.JWT_ALGORITHM])
     except jwt.PyJWTError as exc:
         raise UnauthorizedException("Invalid or expired token") from exc
     if payload.get("type") not in ("access", "upload"):

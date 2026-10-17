@@ -5,6 +5,8 @@ import os
 # fallaría con UnconfiguredEmailSender en vez de llamar a Resend
 os.environ["RESEND_API_KEY"] = ""
 os.environ.setdefault("OTP_EXPIRE_MINUTES", "10")
+# Sin default en Settings: la app no arranca sin clave
+os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-with-enough-length")
 # Postgres ficticio: los tests usan SQLite en memoria y, al ganarle al .env, nunca tocan Neon
 os.environ.setdefault("POSTGRES_HOST", "postgres.test")
 os.environ.setdefault("POSTGRES_USER", "test")
