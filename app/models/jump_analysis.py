@@ -15,6 +15,16 @@ class JumpAnalysisStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class AnalysisStage(str, enum.Enum):
+    """Etapa en curso de un análisis PENDING; mismos valores que kinesiapp.common.v1.AnalysisStage."""
+
+    QUEUED = "queued"
+    DOWNLOADING_VIDEO = "downloading_video"
+    EXTRACTING_POSE = "extracting_pose"
+    DETECTING_REPETITIONS = "detecting_repetitions"
+    SCORING_RISK = "scoring_risk"
+
+
 class MovementType(str, enum.Enum):
     """Qué gesto se grabó: define cómo se busca la repetición y qué patrones de riesgo aplican."""
 
@@ -36,6 +46,20 @@ class JumpAnalysis(Base):
     status: Mapped[JumpAnalysisStatus] = mapped_column(
         Enum(JumpAnalysisStatus), default=JumpAnalysisStatus.PENDING, nullable=False
     )
+    # Progreso persistido: quien se conecta tarde o tras un reinicio lee esto antes del stream en vivo
+    stage: Mapped[AnalysisStage] = mapped_column(
+        Enum(AnalysisStage), default=AnalysisStage.QUEUED, server_default=AnalysisStage.QUEUED.name, nullable=False
+    )
+    frames_processed: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    # 0 mientras no se conoce
+    frames_total: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    # Con progress_updated_at, el arranque detecta análisis atascados y decide si reintentarlos
+    attempts: Mapped[int] = mapped_column(Integer, default=0, server_default="0", nullable=False)
+    progress_updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    # Nombre del ErrorReason del contrato (p. ej. "VIDEO_UNREADABLE") cuando status es FAILED
+    failure_reason: Mapped[str | None] = mapped_column(String(50), nullable=True)
     risk_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     # Patrón que determinó el risk_score; None si ninguno se disparó
     dominant_risk_pattern: Mapped[str | None] = mapped_column(String(50), nullable=True)
