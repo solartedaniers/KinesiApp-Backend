@@ -33,3 +33,12 @@ class PasswordPolicy:
 
     def missing_requirements(self, password: str) -> list[PasswordRequirement]:
         return [requirement for requirement, matches in _MATCHERS.items() if not any(map(matches, password))]
+
+    def ensure_valid(self, password: str) -> str:
+        # ValueError para que Pydantic lo reporte como violación del campo (BadRequest en gRPC)
+        if not self.min_length <= len(password) <= self.max_length:
+            raise ValueError(f"Password must have between {self.min_length} and {self.max_length} characters")
+        missing = self.missing_requirements(password)
+        if missing:
+            raise ValueError(f"Password is missing: {', '.join(requirement.value for requirement in missing)}")
+        return password
