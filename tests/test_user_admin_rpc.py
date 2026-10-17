@@ -15,6 +15,7 @@ from app.admin.user_activation import UserActivation
 from app.admin.user_directory import UserDirectory
 from app.admin.user_provisioning import UserProvisioning
 from app.admin.user_role_assignment import UserRoleAssignment
+from app.auth.one_time_codes import OneTimeCodes
 from app.auth.password_hasher import PasswordHasher
 from app.core.pagination import PageRules
 from app.identity.password_policy import PasswordPolicy
@@ -25,18 +26,32 @@ from app.rpc.user_admin_servicer import UserAdminServicer
 from app.settings.auth import PasswordPolicySettings
 from app.storage.avatar_links import AvatarLinks
 from tests.grpc_harness import error_info
-from tests.rpc_world import FakeBucket, World, bearer, rpc_world, uow_factory
+from tests.rpc_world import AUTH_SETTINGS, FakeBucket, World, bearer, rpc_world, uow_factory
 
 STRONG_PASSWORD = "Kinesi-Prueba-2026"
+HASHER = PasswordHasher()
 
 
-def _run(tmp_path: Path, scenario):
+class _Mailbox:
+    def __init__(self) -> None:
+        self.verification: dict[str, str] = {}
+
+    async def send_verification_code(self, recipient: str, code: str) -> None:
+        self.verification[recipient] = code
+
+    async def send_password_reset_code(self, recipient: str, code: str) -> None:
+        raise AssertionError("The admin never sends reset codes")
+
+
+def _run(tmp_path: Path, scenario, mailbox: _Mailbox | None = None):
+    mailbox = mailbox or _Mailbox()
+
     def register(session_factory):
         uows = uow_factory(session_factory)
         servicer = UserAdminServicer(
             AdminInputRules(PasswordPolicy(PasswordPolicySettings(_env_file=None))),
             PageRules(default_size=2, max_size=3),
-            UserProvisioning(uows, PasswordHasher()),
+            UserProvisioning(uows, HASHER, OneTimeCodes(AUTH_SETTINGS, HASHER), mailbox),
             UserDirectory(uows),
             UserRoleAssignment(uows),
             UserActivation(uows),
@@ -70,7 +85,7 @@ def test_only_admins_reach_the_service(tmp_path: Path) -> None:
     assert _run(tmp_path, scenario).code() == grpc.StatusCode.PERMISSION_DENIED
 
 
-def test_create_user_leaves_it_unverified_and_rejects_duplicates_and_admins(tmp_path: Path) -> None:
+def test_create_user_sends_the_verification_code_and_rejects_duplicates_and_admins(tmp_path: Path) -> None:
     async def scenario(world: World, stub, admin):
         request = user_admin_pb2.CreateUserRequest(
             email="nuevo@kinesiapp.com", password=STRONG_PASSWORD, full_name="Nuevo Deportista",
@@ -82,14 +97,19 @@ def test_create_user_leaves_it_unverified_and_rejects_duplicates_and_admins(tmp_
         as_admin = await _error_of(stub.CreateUser(request, metadata=bearer(admin)))
         request.role, request.password = identity_pb2.USER_ROLE_COACH, "corta"
         weak = await _error_of(stub.CreateUser(request, metadata=bearer(admin)))
-        return created.user, duplicated, as_admin, weak
+        async with world.session_factory() as session:
+            code_hash = (await session.get(User, created.user.id)).verification_code_hash
+        return created.user, duplicated, as_admin, weak, code_hash
 
-    user, duplicated, as_admin, weak = _run(tmp_path, scenario)
+    user, duplicated, as_admin, weak, code_hash = _run(tmp_path, scenario, mailbox := _Mailbox())
 
     assert (user.email, user.role, user.is_verified, user.is_active) == (
         "nuevo@kinesiapp.com", identity_pb2.USER_ROLE_ATHLETE, False, False
     )
     assert user.id > 0 and user.HasField("created_at")
+    # Solo le llega el código a la cuenta creada, y es el que quedó guardado para verificarla
+    assert list(mailbox.verification) == ["nuevo@kinesiapp.com"]
+    assert asyncio.run(HASHER.verify(mailbox.verification["nuevo@kinesiapp.com"], code_hash))
     assert error_info(duplicated).reason == "EMAIL_ALREADY_REGISTERED"
     assert as_admin.code() == weak.code() == grpc.StatusCode.INVALID_ARGUMENT
 

@@ -63,6 +63,13 @@ class RpcServiceFactory:
         self._auth_settings = auth_settings
         self._media_settings = MediaSettings()
         self._password_policy = PasswordPolicy(PasswordPolicySettings())
+        self._mail_settings = MailSettings()
+        # Auth y admin comparten el hasher, los códigos y el correo: los dos emiten códigos de verificación
+        self._hasher = PasswordHasher()
+        self._codes = OneTimeCodes(auth_settings, self._hasher)
+        self._mailer = ThreadedAuthMailer(
+            AuthEmailService(build_email_sender(self._mail_settings), auth_settings.OTP_EXPIRE_MINUTES)
+        )
         storage = StorageSettings()
         self._images = build_signed_storage(storage, self._media_settings, storage.S3_IMAGES_BUCKET)
         self._avatar_links = AvatarLinks(self._images)
@@ -84,22 +91,18 @@ class RpcServiceFactory:
         return SystemServicer(self._clock, client_policy, UnavailableAiLifecycle())
 
     def _auth(self) -> AuthServicer:
-        auth = self._auth_settings
-        mail = MailSettings()
-        hasher = PasswordHasher()
-        tokens = SessionTokenService(auth)
+        hasher, codes, mailer = self._hasher, self._codes, self._mailer
+        tokens = SessionTokenService(self._auth_settings)
         sessions = SessionIssuer(tokens)
-        codes = OneTimeCodes(auth, hasher)
         passwords = PasswordReplacer(hasher)
-        mailer = ThreadedAuthMailer(AuthEmailService(build_email_sender(mail), auth.OTP_EXPIRE_MINUTES))
         return AuthServicer(
-            AuthInputRules(self._password_policy, auth.OTP_LENGTH),
+            AuthInputRules(self._password_policy, self._auth_settings.OTP_LENGTH),
             Registration(
                 self._uow_factory,
                 hasher,
                 codes,
                 mailer,
-                EmailDomainChecker(mail.EMAIL_DNS_TIMEOUT_SECONDS),
+                EmailDomainChecker(self._mail_settings.EMAIL_DNS_TIMEOUT_SECONDS),
                 self._media_settings.VIDEO_CONSENT_VERSION,
             ),
             EmailVerification(self._uow_factory, codes, mailer, sessions),
@@ -123,7 +126,7 @@ class RpcServiceFactory:
         return UserAdminServicer(
             AdminInputRules(self._password_policy),
             PageRules.from_settings(PaginationSettings()),
-            UserProvisioning(self._uow_factory, PasswordHasher()),
+            UserProvisioning(self._uow_factory, self._hasher, self._codes, self._mailer),
             UserDirectory(self._uow_factory),
             UserRoleAssignment(self._uow_factory),
             UserActivation(self._uow_factory),
