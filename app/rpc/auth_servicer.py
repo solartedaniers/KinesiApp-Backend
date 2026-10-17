@@ -1,7 +1,4 @@
-from datetime import datetime
-
 import grpc
-from google.protobuf.timestamp_pb2 import Timestamp
 from kinesiapp.auth.v1 import auth_pb2, auth_pb2_grpc
 
 from app.auth.email_verification import EmailVerification
@@ -21,6 +18,7 @@ from app.auth.registration import Registration
 from app.auth.session_management import SessionManagement
 from app.auth.session_tokens import SessionTokens
 from app.identity.principal import current_principal
+from app.rpc.proto_values import timestamp
 from app.rpc.user_roles import role_from_proto
 
 
@@ -127,12 +125,6 @@ def _session(tokens: SessionTokens) -> auth_pb2.Session:
     return auth_pb2.Session(
         access_token=tokens.access_token,
         refresh_token=tokens.refresh_token,
-        access_token_expires_at=_timestamp(tokens.access_token_expires_at),
-        refresh_token_expires_at=_timestamp(tokens.refresh_token_expires_at),
+        access_token_expires_at=timestamp(tokens.access_token_expires_at),
+        refresh_token_expires_at=timestamp(tokens.refresh_token_expires_at),
     )
-
-
-def _timestamp(moment: datetime) -> Timestamp:
-    timestamp = Timestamp()
-    timestamp.FromDatetime(moment)
-    return timestamp
