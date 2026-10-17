@@ -92,8 +92,8 @@ class JumpAnalysisProcessor:
     """Procesa un análisis PENDING después de responder al cliente (BackgroundTasks).
 
     Abre su propia sesión de base de datos: la del request ya está cerrada cuando corre.
-    ponytail: corre en el threadpool del mismo proceso de la API; si se reinicia el servidor el
-    análisis queda PENDING. Pasar a una cola (ver docs/design) cuando haya carga real.
+    Corre en el threadpool del mismo proceso de la API: si el servidor se reinicia, el análisis
+    queda PENDING hasta que lo recupere el arranque del servidor gRPC.
     """
 
     def __init__(

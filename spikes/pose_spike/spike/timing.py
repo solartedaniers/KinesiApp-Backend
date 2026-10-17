@@ -41,10 +41,8 @@ class FrameTimer:
 class RssSampler:
     """Muestrea la memoria RSS del proceso actual y guarda el pico observado.
 
-    ponytail: sampleo sincrono (una lectura por frame procesado), no un hilo de
-    fondo. Es suficiente para comparar variantes de modelo/resolucion en un
-    spike; si se necesita el pico exacto entre frames, agregar un hilo de
-    muestreo periodico.
+    Lo leo una vez por frame procesado y no en un hilo aparte: me alcanza para
+    comparar modelos y resoluciones, aunque se me puede escapar un pico entre frames.
     """
 
     _process: psutil.Process = field(default_factory=lambda: psutil.Process())
