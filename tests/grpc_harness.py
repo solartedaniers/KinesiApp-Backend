@@ -1,4 +1,4 @@
-"""Servidor gRPC en un puerto libre de localhost para probar servicers e interceptores por la red."""
+"""Levanto un servidor gRPC en un puerto libre de localhost para probar servicers e interceptores por la red."""
 
 from collections.abc import AsyncIterator, Callable, Sequence
 from contextlib import asynccontextmanager

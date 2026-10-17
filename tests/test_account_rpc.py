@@ -1,4 +1,4 @@
-"""AccountService por la red, con el bucket en memoria y los interceptores reales."""
+"""Pruebo AccountService por la red, con el bucket en memoria y los interceptores reales."""
 
 import asyncio
 from functools import partial
@@ -107,7 +107,7 @@ def test_avatar_is_uploaded_directly_and_replaces_the_previous_one(tmp_path: Pat
     assert upload.target.headers["Content-Type"] == "image/png" and length == len(PNG)
     assert key.startswith("avatars/") and key.endswith(".png")
     assert confirmed.avatar.url.startswith(f"https://bucket.test/images/{key}?signature=get")
-    # La foto anterior se borra; confirmar de nuevo la misma subida no borra la nueva
+    # Compruebo que se borra la foto anterior y que confirmar de nuevo no borra la nueva
     assert set(bucket.objects) == {key}
     assert again.avatar.url == confirmed.avatar.url
 
@@ -143,7 +143,7 @@ def test_avatar_upload_rejects_wrong_type_size_or_content(tmp_path: Path) -> Non
     assert error_info(not_uploaded).reason == "UPLOAD_NOT_FOUND"
     assert (not_a_jpeg.code(), error_info(not_a_jpeg).reason) == (grpc.StatusCode.INVALID_ARGUMENT, "INVALID_IMAGE")
     assert error_info(someone_elses).reason == "UPLOAD_NOT_FOUND"
-    # El archivo que no es la imagen declarada no se queda en el bucket
+    # Compruebo que el archivo que no es la imagen declarada no se queda en el bucket
     assert kept is False
 
 

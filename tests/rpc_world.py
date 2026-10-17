@@ -1,4 +1,4 @@
-"""Base común de las pruebas gRPC: SQLite asíncrono en un archivo, interceptores reales y usuarios con token."""
+"""Armo la base de las pruebas gRPC: SQLite asíncrono en un archivo, interceptores reales y usuarios con token."""
 
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -71,7 +71,7 @@ def uow_factory(session_factory: async_sessionmaker[AsyncSession]) -> Callable[[
 
 @dataclass
 class FakeBucket:
-    """Bucket en memoria con las mismas URLs canónicas que guardaría Neon."""
+    """Simulo un bucket en memoria con las mismas URLs canónicas que guardaría Neon."""
 
     objects: dict[str, tuple[bytes, str]] = field(default_factory=dict)
     signed_uploads: list[tuple[str, str, int]] = field(default_factory=list)

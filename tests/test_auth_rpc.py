@@ -1,4 +1,4 @@
-"""AuthService por la red, con los interceptores reales y SQLite asíncrono en un archivo temporal."""
+"""Pruebo AuthService por la red, con los interceptores reales y SQLite asíncrono en un archivo temporal."""
 
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -49,7 +49,7 @@ CONSENT_VERSION = 3
 
 @dataclass
 class _Mailbox:
-    """Mailer falso: guarda el último código enviado a cada correo, o falla si se le pide."""
+    """Simulo el mailer: guardo el último código enviado a cada correo, o fallo si me lo piden."""
 
     verification: dict[str, str] = field(default_factory=dict)
     reset: dict[str, str] = field(default_factory=dict)
@@ -241,7 +241,7 @@ def test_wrong_codes_count_until_the_code_is_no_longer_usable(tmp_path: Path) ->
 
     reasons, attempts = _run(tmp_path, scenario)
 
-    # Tras los 5 intentos fallidos, ni el código correcto sirve
+    # Compruebo que tras los 5 intentos fallidos ni el código correcto sirve
     assert reasons == ["INVALID_OTP"] * 6
     assert attempts == 5
 
@@ -278,7 +278,7 @@ def test_password_recovery_changes_the_password_and_closes_every_session(tmp_pat
             backend.stub.RefreshSession(auth_pb2.RefreshSessionRequest(refresh_token=session.refresh_token))
         )
         login = await backend.stub.Login(auth_pb2.LoginRequest(email=EMAIL, password="Nueva#2026x"))
-        # A un correo sin cuenta no se le envía nada, aunque la respuesta sea la misma
+        # Compruebo que a un correo sin cuenta no le envío nada, aunque la respuesta sea la misma
         return error_info(old_session).reason, bool(login.session.access_token), "nadie@kinesiapp.com" in backend.mailbox.reset
 
     assert _run(tmp_path, scenario) == ("INVALID_REFRESH_TOKEN", True, False)
@@ -314,7 +314,7 @@ def test_change_password_needs_a_session_and_the_current_password(tmp_path: Path
 
     assert _run(tmp_path, scenario) == [
         (grpc.StatusCode.UNAUTHENTICATED, "UNAUTHORIZED"),
-        # INVALID_ARGUMENT y no UNAUTHENTICATED: este último haría que el cliente renueve la sesión
+        # Espero INVALID_ARGUMENT y no UNAUTHENTICATED, que haría que el cliente renueve la sesión
         (grpc.StatusCode.INVALID_ARGUMENT, "INVALID_CURRENT_PASSWORD"),
         (grpc.StatusCode.ALREADY_EXISTS, "PASSWORD_REUSED"),
         (grpc.StatusCode.UNAUTHENTICATED, "INVALID_REFRESH_TOKEN"),

@@ -1,4 +1,4 @@
-"""ResendEmailSender, su armado desde Settings y la verificación DNS del dominio, sin red."""
+"""Pruebo ResendEmailSender, su armado desde Settings y la verificación DNS del dominio, sin red."""
 import dns.exception
 import dns.resolver
 import pytest
@@ -67,7 +67,7 @@ class _MxRecord:
 
 
 class _FakeResolver:
-    """Resolver que responde lo que el test indique por tipo de registro; nunca sale a la red."""
+    """Simulo un resolver que responde lo que el test indique por tipo de registro, sin salir a la red."""
 
     def __init__(self, answers):
         self._answers = answers

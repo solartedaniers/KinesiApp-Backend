@@ -16,7 +16,7 @@ class _RecordingServer:
 
 
 def test_factory_registers_every_migrated_service() -> None:
-    # Las variables ficticias de conftest dejan el bucket sin configurar, y aun así todo debe armarse
+    # Con las variables ficticias de conftest el bucket queda sin configurar, y aun así todo debe armarse
     server = _RecordingServer()
     for register in RpcServiceFactory(async_sessionmaker(), AUTH_SETTINGS).registrations():
         register(server)

@@ -1,4 +1,4 @@
-"""UserAdminService por la red, con los interceptores reales que exigen el rol ADMIN."""
+"""Pruebo UserAdminService por la red, con los interceptores reales que exigen el rol ADMIN."""
 
 import asyncio
 from datetime import date, datetime, timedelta, timezone
@@ -107,7 +107,7 @@ def test_create_user_sends_the_verification_code_and_rejects_duplicates_and_admi
         "nuevo@kinesiapp.com", identity_pb2.USER_ROLE_ATHLETE, False, False
     )
     assert user.id > 0 and user.HasField("created_at")
-    # Solo le llega el código a la cuenta creada, y es el que quedó guardado para verificarla
+    # Compruebo que el código solo llega a la cuenta creada y que es el que quedó guardado
     assert list(mailbox.verification) == ["nuevo@kinesiapp.com"]
     assert asyncio.run(HASHER.verify(mailbox.verification["nuevo@kinesiapp.com"], code_hash))
     assert error_info(duplicated).reason == "EMAIL_ALREADY_REGISTERED"

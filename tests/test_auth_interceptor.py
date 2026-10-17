@@ -34,7 +34,7 @@ class _FakeVerifier:
 
 
 class _PrincipalSystem(SystemServicer):
-    """Responde WakeUpAi solo para comprobar quién llegó al handler."""
+    """Respondo WakeUpAi solo para comprobar quién llegó al handler."""
 
     def __init__(self, seen: list[Principal]) -> None:
         super().__init__(lambda: datetime.now(timezone.utc), GetClientPolicyResponse(), UnavailableAiLifecycle())
