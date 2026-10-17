@@ -1,0 +1,6 @@
+# Servidor gRPC (app/rpc). Separado de requirements.txt mientras conviven FastAPI y gRPC: este
+# contenedor no necesita la pila de IA ni la base de datos
+grpcio==1.84.0
+# Igual o más nueva que la que usa grpcio-tools para generar el código
+protobuf==7.36.2
+pydantic-settings==2.7.1
