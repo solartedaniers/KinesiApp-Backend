@@ -8,18 +8,19 @@ from alembic import context
 # app.models importa todos los modelos ORM y los registra en Base.metadata;
 # sin este import, autogenerate vería una metadata vacía.
 import app.models  # noqa: F401
-from app.core.config import settings
 from app.models.base import Base
+from app.settings.database import DatabaseSettings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-# La URL de conexión sale de Settings (variables de entorno / .env), nunca de
-# alembic.ini, para no duplicar ni desincronizar credenciales.
+# La URL de conexión sale de DatabaseSettings (variables de entorno / .env), nunca de
+# alembic.ini, para no duplicar ni desincronizar credenciales. Solo pido las de la base: migrar no
+# debería exigir el secreto JWT ni las credenciales del bucket.
 config.set_main_option(
     "sqlalchemy.url",
-    settings.database_url.render_as_string(hide_password=False).replace("%", "%%"),
+    DatabaseSettings().database_url.render_as_string(hide_password=False).replace("%", "%%"),
 )
 
 # Interpret the config file for Python logging.
