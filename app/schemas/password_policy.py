@@ -3,20 +3,21 @@ from typing import Annotated
 from pydantic import AfterValidator, Field
 
 from app.core.config import settings
+from app.identity.password_policy import PasswordPolicy, PasswordRequirement
 
-# Cada requisito con su descripción, en el orden en que se reportan los que faltan
-_PASSWORD_REQUIREMENTS = (
-    ("one uppercase letter", str.isupper),
-    ("one lowercase letter", str.islower),
-    ("one digit", str.isdecimal),
-    ("one special character", lambda char: not char.isalnum() and not char.isspace()),
-)
+_policy = PasswordPolicy(settings)
+_DESCRIPTIONS = {
+    PasswordRequirement.UPPERCASE: "one uppercase letter",
+    PasswordRequirement.LOWERCASE: "one lowercase letter",
+    PasswordRequirement.DIGIT: "one digit",
+    PasswordRequirement.SPECIAL_CHARACTER: "one special character",
+}
 
 
 def _require_character_classes(value: str) -> str:
-    missing = [name for name, matches in _PASSWORD_REQUIREMENTS if not any(matches(char) for char in value)]
+    missing = _policy.missing_requirements(value)
     if missing:
-        raise ValueError(f"Password must contain at least {', '.join(missing)}")
+        raise ValueError(f"Password must contain at least {', '.join(_DESCRIPTIONS[m] for m in missing)}")
     return value
 
 
@@ -24,6 +25,6 @@ def _require_character_classes(value: str) -> str:
 # exactamente las mismas reglas en lib/validation.ts (validateNewPassword)
 StrongPassword = Annotated[
     str,
-    Field(min_length=settings.PASSWORD_MIN_LENGTH, max_length=settings.PASSWORD_MAX_LENGTH),
+    Field(min_length=_policy.min_length, max_length=_policy.max_length),
     AfterValidator(_require_character_classes),
 ]
