@@ -94,3 +94,26 @@ Tests never touch Neon: they run on in-memory SQLite, and `tests/conftest.py` se
 (`spikes/pose_spike/videos/`, not versioned) and is skipped when they or the model are missing.
 Every other test runs without MediaPipe: the API tests swap the analyzer for a stub
 (`tests/conftest.py`).
+
+## gRPC server (migration in progress)
+
+The contracts live in the `contracts/` submodule (KinesiApp-Contracts, pinned to a tag). The Python code is generated into `generated/`, which is not versioned:
+
+```bash
+git submodule update --init
+python scripts/generate_grpc.py   # needs requirements-grpc-build.txt
+pytest tests/test_system_rpc.py   # pytest.ini already adds generated/ to the path
+```
+
+Run the server alone (it listens on `GRPC_HOST:GRPC_PORT`, `127.0.0.1:50051` by default):
+
+```bash
+PYTHONPATH=generated python -m app.rpc.server
+```
+
+Or run the deployable container: Envoy listens on `$PORT`, translates gRPC-Web (HTTP/1.1) into native gRPC for grpcio on localhost, answers `/healthz`, and only forwards `/kinesiapp.*` paths:
+
+```bash
+docker build -f deploy/grpc/Dockerfile -t kinesiapp-grpc .
+docker run --rm -e PORT=10000 -p 10000:10000 kinesiapp-grpc
+```
