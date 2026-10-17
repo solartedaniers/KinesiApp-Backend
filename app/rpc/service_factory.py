@@ -8,6 +8,7 @@ from kinesiapp.admin.v1 import user_admin_pb2_grpc
 from kinesiapp.athlete.v1 import athlete_profile_service_pb2_grpc, managed_athlete_service_pb2_grpc
 from kinesiapp.auth.v1 import auth_pb2_grpc
 from kinesiapp.system.v1 import system_pb2_grpc
+from kinesiapp.team.v1 import team_pb2_grpc
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.account.account_profile import AccountProfile
@@ -50,6 +51,7 @@ from app.rpc.auth_servicer import AuthServicer
 from app.rpc.client_policy import build_client_policy
 from app.rpc.managed_athlete_servicer import ManagedAthleteServicer
 from app.rpc.system_servicer import SystemServicer
+from app.rpc.team_servicer import TeamServicer
 from app.rpc.user_admin_servicer import UserAdminServicer
 from app.services.email_domain_checker import EmailDomainChecker
 from app.settings.athlete import AthleteSettings
@@ -62,6 +64,8 @@ from app.storage.avatar_files import AvatarFiles
 from app.storage.avatar_links import AvatarLinks
 from app.storage.signed_storage_factory import build_signed_storage
 from app.storage.upload_tickets import UploadTicketService
+from app.teams.team_catalog import TeamCatalog
+from app.teams.team_membership import TeamMembership
 
 ServicerRegistration = Callable[[grpc.aio.Server], None]
 
@@ -98,6 +102,7 @@ class RpcServiceFactory:
             partial(user_admin_pb2_grpc.add_UserAdminServiceServicer_to_server, self._user_admin()),
             partial(athlete_profile_service_pb2_grpc.add_AthleteProfileServiceServicer_to_server, self._athlete_profiles()),
             partial(managed_athlete_service_pb2_grpc.add_ManagedAthleteServiceServicer_to_server, self._managed_athletes()),
+            partial(team_pb2_grpc.add_TeamServiceServicer_to_server, self._teams()),
         ]
 
     @staticmethod
@@ -168,3 +173,6 @@ class RpcServiceFactory:
             ManagedAthleteAvatars(self._uow_factory, self._avatar_files),
             AthleteMessages(self._avatar_links),
         )
+
+    def _teams(self) -> TeamServicer:
+        return TeamServicer(TeamCatalog(self._uow_factory), TeamMembership(self._uow_factory))
