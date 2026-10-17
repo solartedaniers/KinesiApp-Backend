@@ -5,8 +5,7 @@ from google.protobuf import descriptor_pool
 from kinesiapp.common.v1 import identity_pb2
 
 from app.models.user import UserRole
-
-_ROLE_PREFIX = "USER_ROLE_"
+from app.rpc.user_roles import role_from_proto
 
 
 @dataclass(frozen=True)
@@ -28,5 +27,5 @@ def access_for(method: str) -> MethodAccess:
     if not options.HasExtension(identity_pb2.access):
         return MethodAccess(public=False, roles=frozenset())
     policy = options.Extensions[identity_pb2.access]
-    roles = frozenset(UserRole[identity_pb2.UserRole.Name(role).removeprefix(_ROLE_PREFIX)] for role in policy.roles)
+    roles = frozenset(role for role in map(role_from_proto, policy.roles) if role is not None)
     return MethodAccess(public=policy.public, roles=roles)
