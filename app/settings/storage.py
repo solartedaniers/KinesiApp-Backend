@@ -4,7 +4,7 @@ from app.settings.base import EnvSettings
 
 
 class StorageSettings(EnvSettings):
-    """Almacenamiento de objetos compatible con S3 de Neon, con los mismos nombres que usa boto3.
+    """Configuro el almacenamiento S3 de Neon con los mismos nombres que usa boto3.
 
     Sin credenciales, subir un archivo responde storage_unavailable.
     """
@@ -22,27 +22,27 @@ class StorageSettings(EnvSettings):
 
 
 class MediaSettings(EnvSettings):
-    """Límites y permisos de los videos y avatares que suben las personas."""
+    """Fijo los límites y permisos de los videos y avatares que suben las personas."""
 
     MAX_VIDEO_UPLOAD_BYTES: int = Field(default=100 * 1024 * 1024, gt=0)
-    # El cliente lo valida leyendo los metadatos del video antes de subirlo
+    # Lo expongo para que el cliente lo valide leyendo los metadatos del video antes de subirlo
     MAX_VIDEO_DURATION_SECONDS: int = Field(default=40, gt=0)
-    # El cliente ya la redimensiona y comprime en un Web Worker antes de enviarla
+    # Me alcanza con este tope porque el cliente la redimensiona y comprime en un Web Worker
     MAX_AVATAR_UPLOAD_BYTES: int = Field(default=1_000_000, gt=0)
-    # Versión vigente del texto de consentimiento de video: subir exige haber aceptado esta
+    # Para subir exijo haber aceptado esta versión vigente del texto de consentimiento de video
     VIDEO_CONSENT_VERSION: int = Field(default=1, gt=0)
-    # Vida del token que autoriza reproducir un video. Va en la URL porque los reproductores no mandan
-    # el header Authorization, por eso es corta
+    # Le doy una vida corta al token que autoriza reproducir un video porque va en la URL: los
+    # reproductores no mandan el header Authorization
     VIDEO_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=10, gt=0)
-    # Token con el que el navegador sube un video directo a la API. Se valida al terminar de llegar el
-    # cuerpo, así que debe durar más que la subida más lenta
+    # Valido el token de subida directa a la API al terminar de llegar el cuerpo, así que debe durar más
+    # que la subida más lenta
     VIDEO_UPLOAD_TOKEN_EXPIRE_MINUTES: int = Field(default=30, gt=0)
-    # Vida de la URL firmada con la que el navegador sube directo al bucket: debe cubrir la subida más lenta
+    # Hago durar la URL firmada de subida al bucket lo suficiente para cubrir la subida más lenta
     SIGNED_UPLOAD_URL_EXPIRE_SECONDS: int = Field(default=900, gt=0, le=7 * 24 * 3600)
-    # Vida del upload_id con el que se confirma la subida: más larga que la URL, porque la subida empieza
-    # antes de que la URL venza pero puede terminar después
+    # Hago durar el upload_id más que la URL porque la subida empieza antes de que la URL venza pero
+    # puede terminar después
     UPLOAD_TICKET_EXPIRE_SECONDS: int = Field(default=3600, gt=0)
-    # Vida de la URL firmada para ver un archivo privado; el cliente pide otra al vencer
+    # Le doy a la URL firmada de lectura una vida corta; el cliente pide otra al vencer
     SIGNED_READ_URL_EXPIRE_SECONDS: int = Field(default=300, gt=0, le=7 * 24 * 3600)
-    # Clave del proceso interno que reporta resultados por REST. Sin definir, ese endpoint rechaza toda llamada
+    # Sin esta clave del proceso que reporta resultados por REST, rechazo toda llamada a ese endpoint
     JUMP_ANALYSIS_SERVICE_API_KEY: SecretStr | None = None

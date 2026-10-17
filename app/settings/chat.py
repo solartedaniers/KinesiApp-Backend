@@ -4,7 +4,7 @@ from app.settings.base import EnvSettings
 
 
 class ChatSettings(EnvSettings):
-    """Chat con Gemini. Sin GEMINI_API_KEY el chat responde assistant_unavailable."""
+    """Configuro el chat con Gemini; sin GEMINI_API_KEY respondo assistant_unavailable."""
 
     GEMINI_API_KEY: SecretStr | None = None
     GEMINI_MODEL: str = "gemini-3.8-flash"
@@ -14,5 +14,5 @@ class ChatSettings(EnvSettings):
     CHAT_HISTORY_MAX_MESSAGES: int = Field(default=10, ge=0)
     CHAT_PROMPT_MAX_REPETITIONS: int = Field(default=5, ge=0)
     CHAT_RATE_LIMIT_PER_USER_PER_HOUR: int = Field(default=20, gt=0)
-    # Por debajo del límite de requests por minuto del free tier del modelo
+    # Lo dejo por debajo del límite de requests por minuto del free tier del modelo
     CHAT_RATE_LIMIT_GLOBAL_PER_MINUTE: int = Field(default=8, gt=0)

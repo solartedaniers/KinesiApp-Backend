@@ -2,12 +2,12 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Cada repo lee su propio .env, en la raíz de KinesiApp-Backend
+# Leo el .env de la raíz de KinesiApp-Backend: cada repo tiene el suyo
 ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
 class EnvSettings(BaseSettings):
-    """Base de la configuración de cada dominio: lee las variables de entorno y el .env."""
+    """Leo las variables de entorno y el .env; la configuración de cada dominio hereda de aquí."""
 
     model_config = SettingsConfigDict(
         env_file=ENV_FILE,

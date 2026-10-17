@@ -4,7 +4,7 @@ from app.settings.base import EnvSettings
 
 
 class HttpApiSettings(EnvSettings):
-    """API REST de FastAPI. Desaparece cuando el frontend termine de migrar a gRPC."""
+    """Configuro la API REST de FastAPI, que desaparece cuando el frontend termine de migrar a gRPC."""
 
     PROJECT_NAME: str = "KinesiApp API"
     API_V1_PREFIX: str = "/api/v1"

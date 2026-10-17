@@ -5,7 +5,7 @@ from app.settings.base import ENV_FILE, EnvSettings
 
 
 class GrpcServerSettings(EnvSettings):
-    """Configuración del servidor gRPC, leída de las variables GRPC_*."""
+    """Configuro el servidor gRPC con las variables GRPC_*."""
 
     model_config = SettingsConfigDict(env_prefix="GRPC_", env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore")
 

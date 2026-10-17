@@ -5,9 +5,9 @@ from app.settings.base import EnvSettings
 
 
 class DatabaseSettings(EnvSettings):
-    """Conexión a Neon. Sin valores por defecto: si faltan, la app no arranca en vez de buscar un Postgres local."""
+    """Configuro la conexión a Neon sin defaults: si faltan, la app no arranca en vez de buscar otro Postgres."""
 
-    # Local: endpoint directo; en Render, el "-pooler"
+    # En local uso el endpoint directo; en Render, el "-pooler"
     POSTGRES_USER: str = Field(min_length=1)
     POSTGRES_PASSWORD: SecretStr = Field(min_length=1)
     POSTGRES_HOST: str = Field(min_length=1)
@@ -25,7 +25,7 @@ class DatabaseSettings(EnvSettings):
         return self._url("postgresql+asyncpg")
 
     def _url(self, drivername: str) -> URL:
-        # URL.create escapa bien las credenciales con @, :, / o %
+        # Uso URL.create porque escapa bien las credenciales con @, :, / o %
         return URL.create(
             drivername=drivername,
             username=self.POSTGRES_USER,
