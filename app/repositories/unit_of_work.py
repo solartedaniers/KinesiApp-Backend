@@ -28,7 +28,9 @@ class UnitOfWork:
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc: BaseException | None, traceback: TracebackType | None
     ) -> None:
-        # Lo que no se confirmó con commit se descarta, también si el caso de uso falló a mitad
+        # Lo que no se confirmó con commit se descarta, también si el caso de uso falló a mitad.
+        # Separo antes las instancias porque el rollback las expira y el caso de uso ya las devolvió
+        self._session.expunge_all()
         await self._session.rollback()
         await self._session.close()
 
