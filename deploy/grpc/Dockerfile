@@ -18,8 +18,7 @@ COPY --from=envoy /usr/local/bin/envoy /usr/local/bin/envoy
 COPY requirements-grpc.txt .
 RUN pip install --no-cache-dir -r requirements-grpc.txt
 COPY --from=codegen /build/generated ./generated
-COPY app/__init__.py app/
-COPY app/rpc app/rpc
+COPY app app
 COPY deploy/grpc/envoy.yaml.template deploy/grpc/entrypoint.sh deploy/grpc/
 
 ENV PYTHONPATH=/app/generated PYTHONUNBUFFERED=1
