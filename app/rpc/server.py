@@ -4,26 +4,41 @@ import asyncio
 import contextlib
 import logging
 import signal
+from collections.abc import Sequence
 from datetime import datetime, timezone
 
 import grpc
 from kinesiapp.system.v1 import system_pb2_grpc
 
+from app.core.async_database import build_async_engine, build_session_factory
+from app.identity.access_tokens import AccessTokenVerifier, JwtAccessTokenVerifier
+from app.rpc.interceptors.auth import AuthInterceptor
+from app.rpc.interceptors.errors import ErrorInterceptor
+from app.rpc.interceptors.logging import LoggingInterceptor
 from app.rpc.system_servicer import SystemServicer
+from app.settings.auth import AuthSettings
+from app.settings.database import DatabaseSettings
 from app.settings.grpc import GrpcServerSettings
 
 logger = logging.getLogger(__name__)
 
 
-def build_server(settings: GrpcServerSettings) -> grpc.aio.Server:
-    server = grpc.aio.server()
+def build_interceptors(verifier: AccessTokenVerifier) -> list[grpc.aio.ServerInterceptor]:
+    # El orden importa: logging ve el status final y el de errores traduce también los rechazos de auth
+    return [LoggingInterceptor(), ErrorInterceptor(), AuthInterceptor(verifier)]
+
+
+def build_server(settings: GrpcServerSettings, interceptors: Sequence[grpc.aio.ServerInterceptor]) -> grpc.aio.Server:
+    server = grpc.aio.server(interceptors=list(interceptors))
     system_pb2_grpc.add_SystemServiceServicer_to_server(SystemServicer(lambda: datetime.now(timezone.utc)), server)
     server.add_insecure_port(f"{settings.HOST}:{settings.PORT}")
     return server
 
 
-async def serve(settings: GrpcServerSettings) -> None:
-    server = build_server(settings)
+async def serve(settings: GrpcServerSettings, auth_settings: AuthSettings, database_settings: DatabaseSettings) -> None:
+    engine = build_async_engine(database_settings)
+    verifier = JwtAccessTokenVerifier(auth_settings, build_session_factory(engine))
+    server = build_server(settings, build_interceptors(verifier))
     await server.start()
     logger.info("gRPC server listening on %s:%s", settings.HOST, settings.PORT)
 
@@ -35,9 +50,10 @@ async def serve(settings: GrpcServerSettings) -> None:
         await stopping.wait()
     finally:
         await server.stop(settings.SHUTDOWN_GRACE_SECONDS)
+        await engine.dispose()
         logger.info("gRPC server stopped")
 
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    asyncio.run(serve(GrpcServerSettings()))
+    asyncio.run(serve(GrpcServerSettings(), AuthSettings(), DatabaseSettings()))

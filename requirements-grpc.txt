@@ -9,3 +9,5 @@ pydantic-settings==2.7.1
 # Mismos modelos ORM que el REST, pero con sesiones asíncronas sobre asyncpg
 sqlalchemy[asyncio]==2.0.36
 asyncpg==0.32.0
+# El interceptor de autenticación valida los mismos JWT que emite el backend
+PyJWT==2.10.1
