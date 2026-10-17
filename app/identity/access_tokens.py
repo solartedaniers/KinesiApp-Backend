@@ -21,7 +21,7 @@ class AccessTokenVerifier(Protocol):
 
 
 class JwtAccessTokenVerifier:
-    """Valida un access token firmado por este backend y resuelve un usuario activo."""
+    """Valido un access token firmado por este backend y resuelvo un usuario activo."""
 
     def __init__(self, settings: AuthSettings, session_factory: async_sessionmaker[AsyncSession]) -> None:
         self._settings = settings

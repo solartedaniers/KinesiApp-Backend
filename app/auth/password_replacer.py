@@ -6,7 +6,7 @@ from app.models.user import User
 
 
 class PasswordReplacer:
-    """Cambia el hash de la contraseña, rechazando la misma que ya tiene (recuperación y cambio)."""
+    """Cambio el hash de la contraseña y rechazo la misma que ya tiene (recuperación y cambio)."""
 
     def __init__(self, hasher: PasswordHasher) -> None:
         self._hasher = hasher

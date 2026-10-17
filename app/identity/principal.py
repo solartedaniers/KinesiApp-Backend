@@ -6,7 +6,7 @@ from app.models.user import UserRole
 
 @dataclass(frozen=True)
 class Principal:
-    """Quién hace la llamada, ya autenticado por el interceptor."""
+    """Guardo quién hace la llamada, ya autenticado por el interceptor."""
 
     user_id: int
     role: UserRole

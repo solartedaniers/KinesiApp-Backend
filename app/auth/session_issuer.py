@@ -4,7 +4,7 @@ from app.repositories.unit_of_work import UnitOfWork
 
 
 class SessionIssuer:
-    """Abre una sesión: firma el par de tokens y registra el refresh token para poder revocarlo."""
+    """Abro una sesión: firmo el par de tokens y registro el refresh token para poder revocarlo."""
 
     def __init__(self, tokens: SessionTokenService) -> None:
         self._tokens = tokens

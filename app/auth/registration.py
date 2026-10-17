@@ -19,7 +19,7 @@ class EmailDomainChecker(Protocol):
 
 
 class Registration:
-    """Crea la cuenta sin verificar, con el consentimiento de video aceptado, y envía el código de verificación."""
+    """Creo la cuenta sin verificar, con el consentimiento de video aceptado, y envío el código de verificación."""
 
     def __init__(
         self,
@@ -50,7 +50,7 @@ class Registration:
             user = await uow.users.get_by_email(data.email)
             if user is not None and user.is_verified:
                 raise DomainError(ErrorReason.ERROR_REASON_EMAIL_ALREADY_REGISTERED, "The email is already registered")
-            # Una cuenta sin verificar con el mismo correo se reemplaza: quizá perdió el código
+            # Reemplazo una cuenta sin verificar con el mismo correo: quizá su dueño perdió el código
             if user is None:
                 user = User(email=data.email)
                 uow.users.add(user)

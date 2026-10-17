@@ -11,7 +11,7 @@ from app.repositories.unit_of_work import UnitOfWork
 
 
 class PasswordChange:
-    """Cambio con sesión iniciada: exige la actual, cierra las demás sesiones y abre una en este dispositivo."""
+    """Cambio la contraseña con sesión iniciada: exijo la actual, cierro las demás sesiones y abro una aquí."""
 
     def __init__(
         self,

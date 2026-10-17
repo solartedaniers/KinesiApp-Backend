@@ -11,7 +11,7 @@ from app.repositories.unit_of_work import UnitOfWork
 
 
 class PasswordRecovery:
-    """Recuperación en tres pasos: pedir el código, validarlo y fijar la contraseña nueva."""
+    """Recupero la contraseña en tres pasos: pedir el código, validarlo y fijar la nueva."""
 
     def __init__(
         self,
@@ -28,7 +28,7 @@ class PasswordRecovery:
     async def request_code(self, email: str) -> None:
         async with self._uow_factory() as uow:
             user = await uow.users.get_by_email(email)
-            # Misma respuesta exista o no el correo, para no enumerar cuentas
+            # Respondo igual exista o no el correo, para no enumerar cuentas
             if user is None:
                 return
             code = await self._codes.assign(user, CodePurpose.PASSWORD_RESET)
@@ -36,7 +36,7 @@ class PasswordRecovery:
         await self._mailer.send_password_reset_code(email, code)
 
     async def verify_code(self, email: str, code: str) -> None:
-        # Valida sin consumir el código; los intentos fallidos sí cuentan
+        # Valido sin consumir el código, pero cuento los intentos fallidos
         async with self._uow_factory() as uow:
             await self._codes.check(uow, await _existing_user(uow, email), CodePurpose.PASSWORD_RESET, code)
 
@@ -46,7 +46,7 @@ class PasswordRecovery:
             await self._codes.check(uow, user, CodePurpose.PASSWORD_RESET, code)
             await self._passwords.replace(user, new_password)
             self._codes.clear(user, CodePurpose.PASSWORD_RESET)
-            # La contraseña nueva cierra toda sesión abierta, por si un dispositivo se perdió
+            # Con la contraseña nueva cierro toda sesión abierta, por si se perdió un dispositivo
             await uow.refresh_tokens.revoke_all_for_user(user.id)
             await uow.commit()
 
@@ -54,6 +54,6 @@ class PasswordRecovery:
 async def _existing_user(uow: UnitOfWork, email: str) -> User:
     user = await uow.users.get_by_email(email)
     if user is None:
-        # El mismo error que un código incorrecto: no revela qué correos existen
+        # Devuelvo el mismo error que con un código incorrecto para no revelar qué correos existen
         raise DomainError(ErrorReason.ERROR_REASON_INVALID_OTP, "Invalid or expired verification code")
     return user

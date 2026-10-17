@@ -10,7 +10,7 @@ from app.repositories.unit_of_work import UnitOfWork
 
 
 class SessionManagement:
-    """Inicia, renueva y cierra sesiones."""
+    """Inicio, renuevo y cierro sesiones."""
 
     def __init__(
         self,
@@ -35,7 +35,7 @@ class SessionManagement:
                 )
             if not await self._hasher.verify(password, user.hashed_password):
                 raise DomainError(ErrorReason.ERROR_REASON_INVALID_CREDENTIALS, "Incorrect email or password")
-            # Verificado antes que activo: una cuenta pendiente está inactiva y debe recibir "verifica tu correo"
+            # Reviso verificado antes que activo: una cuenta pendiente está inactiva y debe recibir "verifica tu correo"
             if not user.is_verified:
                 raise DomainError(ErrorReason.ERROR_REASON_EMAIL_NOT_VERIFIED, "The email must be verified first")
             if not user.is_active:
@@ -50,7 +50,7 @@ class SessionManagement:
             stored = await uow.refresh_tokens.get_by_token_hash(self._tokens.fingerprint(refresh_token))
             if stored is None or not stored.is_active or stored.user_id != user_id:
                 raise _invalid_refresh_token()
-            # Rotación: el token usado queda revocado aunque la renovación falle después
+            # Roto el token: el usado queda revocado aunque la renovación falle después
             uow.refresh_tokens.revoke(stored)
             user = await uow.users.get(user_id)
             if user is None or not user.is_active:
@@ -63,7 +63,7 @@ class SessionManagement:
     async def logout(self, refresh_token: str) -> None:
         async with self._uow_factory() as uow:
             stored = await uow.refresh_tokens.get_by_token_hash(self._tokens.fingerprint(refresh_token))
-            # Idempotente: si no existe o ya estaba revocado, el resultado buscado ya se cumple
+            # Lo hago idempotente: si no existe o ya estaba revocado, el resultado buscado ya se cumple
             if stored is not None and stored.is_active:
                 uow.refresh_tokens.revoke(stored)
                 await uow.commit()

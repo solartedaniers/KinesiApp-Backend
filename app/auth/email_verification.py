@@ -11,7 +11,7 @@ from app.repositories.unit_of_work import UnitOfWork
 
 
 class EmailVerification:
-    """Reenvía el código de verificación y, con el código correcto, activa la cuenta y abre la primera sesión."""
+    """Reenvío el código de verificación y, con el código correcto, activo la cuenta y abro la primera sesión."""
 
     def __init__(
         self,
@@ -28,7 +28,7 @@ class EmailVerification:
     async def request_code(self, email: str) -> None:
         async with self._uow_factory() as uow:
             user = await uow.users.get_by_email(email)
-            # Sin error si no existe o ya está verificada: la respuesta no revela qué cuentas hay
+            # No doy error si no existe o ya está verificada: así la respuesta no revela qué cuentas hay
             if user is None or user.is_verified:
                 return
             code = await self._codes.assign(user, CodePurpose.VERIFICATION)

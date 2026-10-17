@@ -26,7 +26,7 @@ class _RefreshTokenClaims(BaseModel):
 
 
 class SessionTokenService:
-    """Firma los JWT de sesión con el mismo formato del REST, para que ambos acepten los tokens del otro."""
+    """Firmo los JWT de sesión con el mismo formato del REST, para que ambos acepten los tokens del otro."""
 
     def __init__(self, settings: AuthSettings) -> None:
         self._secret = settings.JWT_SECRET_KEY.get_secret_value()
@@ -39,7 +39,7 @@ class SessionTokenService:
         access_expires_at = now + self._access_lifetime
         refresh_expires_at = now + self._refresh_lifetime
         access = {"sub": str(user_id), "type": "access", "iat": now, "exp": access_expires_at}
-        # jti: dos refresh emitidos en el mismo segundo serían idénticos y chocarían con el UNIQUE de token_hash
+        # Agrego jti porque dos refresh del mismo segundo serían idénticos y chocarían con el UNIQUE de token_hash
         refresh = {"sub": str(user_id), "type": "refresh", "iat": now, "exp": refresh_expires_at,
                    "jti": secrets.token_hex(16)}
         return SessionTokens(

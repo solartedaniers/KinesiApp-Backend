@@ -4,7 +4,7 @@ from passlib.context import CryptContext
 
 
 class PasswordHasher:
-    """bcrypt, el mismo esquema del REST, así las contraseñas y los códigos guardados siguen sirviendo."""
+    """Uso bcrypt, el mismo esquema del REST, para que las contraseñas y los códigos guardados sigan sirviendo."""
 
     def __init__(self) -> None:
         self._context = CryptContext(schemes=["bcrypt"], deprecated="auto")

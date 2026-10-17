@@ -5,7 +5,7 @@ from app.settings.auth import PasswordPolicySettings
 
 
 class PasswordRequirement(str, enum.Enum):
-    """Clases de caracter exigidas; mismos nombres que kinesiapp.system.v1.PasswordRequirement."""
+    """Nombro las clases de caracteres exigidas igual que kinesiapp.system.v1.PasswordRequirement."""
 
     UPPERCASE = "uppercase"
     LOWERCASE = "lowercase"
@@ -13,7 +13,7 @@ class PasswordRequirement(str, enum.Enum):
     SPECIAL_CHARACTER = "special_character"
 
 
-# En el orden en que se informan las que faltan
+# Informo las que faltan en este orden
 _MATCHERS: dict[PasswordRequirement, Callable[[str], bool]] = {
     PasswordRequirement.UPPERCASE: str.isupper,
     PasswordRequirement.LOWERCASE: str.islower,
@@ -23,7 +23,7 @@ _MATCHERS: dict[PasswordRequirement, Callable[[str], bool]] = {
 
 
 class PasswordPolicy:
-    """Política única de contraseñas nuevas (registro, recuperación y cambio)."""
+    """Aplico una única política a las contraseñas nuevas (registro, recuperación y cambio)."""
 
     requirements: tuple[PasswordRequirement, ...] = tuple(_MATCHERS)
 
@@ -35,7 +35,7 @@ class PasswordPolicy:
         return [requirement for requirement, matches in _MATCHERS.items() if not any(map(matches, password))]
 
     def ensure_valid(self, password: str) -> str:
-        # ValueError para que Pydantic lo reporte como violación del campo (BadRequest en gRPC)
+        # Lanzo ValueError para que Pydantic lo reporte como violación del campo (BadRequest en gRPC)
         if not self.min_length <= len(password) <= self.max_length:
             raise ValueError(f"Password must have between {self.min_length} and {self.max_length} characters")
         missing = self.missing_requirements(password)

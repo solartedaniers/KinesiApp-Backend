@@ -11,7 +11,7 @@ from app.schemas.person_name import PersonName
 
 @dataclass(frozen=True)
 class AuthInputRules:
-    """Reglas de las peticiones de autenticación que salen de la configuración."""
+    """Agrupo las reglas de las peticiones de autenticación que salen de la configuración."""
 
     password_policy: PasswordPolicy
     otp_length: int
@@ -29,7 +29,7 @@ def _strong_password(value: str, info: ValidationInfo) -> str:
 
 
 def _existing_password(value: str, info: ValidationInfo) -> str:
-    # Sin la política vigente: una contraseña anterior a la regla debe seguir sirviendo para entrar
+    # No aplico la política vigente: una contraseña anterior a la regla debe seguir sirviendo para entrar
     if not 1 <= len(value) <= _rules(info).password_policy.max_length:
         raise ValueError("Password is required")
     return value
@@ -54,7 +54,7 @@ class CodeInput(EmailInput):
 class RegisterInput(EmailInput):
     password: str
     full_name: PersonName
-    # El registro público solo admite estos dos; ADMIN lo asigna otro admin
+    # En el registro público solo admito estos dos; ADMIN lo asigna otro admin
     role: Literal[UserRole.ATHLETE, UserRole.COACH]
     accepted_video_consent_version: int
 

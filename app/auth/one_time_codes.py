@@ -13,14 +13,14 @@ from app.settings.auth import AuthSettings
 
 
 class CodePurpose(enum.Enum):
-    """Para qué es el código; el valor es el prefijo de sus columnas en users."""
+    """Uso como valor el prefijo de las columnas del código en users."""
 
     VERIFICATION = "verification_code"
     PASSWORD_RESET = "password_reset_code"
 
 
 class OneTimeCodes:
-    """Emite y comprueba los códigos de verificación y de recuperación, con vencimiento e intentos limitados."""
+    """Emito y compruebo los códigos de verificación y de recuperación, con vencimiento e intentos limitados."""
 
     def __init__(self, settings: AuthSettings, hasher: PasswordHasher) -> None:
         self._length = settings.OTP_LENGTH

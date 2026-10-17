@@ -11,7 +11,7 @@ from app.services.email_domain_checker import EmailDomainChecker
 
 @lru_cache
 def get_email_sender() -> EmailSender:
-    # Uno por proceso: el SDK de Resend se configura a nivel de módulo
+    # Creo uno por proceso porque el SDK de Resend se configura a nivel de módulo
     return build_email_sender(settings)
 
 
