@@ -15,6 +15,10 @@ class StorageSettings(EnvSettings):
     AWS_SECRET_ACCESS_KEY: SecretStr | None = None
     S3_VIDEOS_BUCKET: str = Field(default="videos", min_length=1)
     S3_IMAGES_BUCKET: str = Field(default="images", min_length=1)
+    # Buckets privados del servidor gRPC, sin default a propósito: los públicos de arriba son de producción
+    # y sin estos el servidor responde storage_unavailable en vez de escribir en ellos
+    S3_PRIVATE_IMAGES_BUCKET: str | None = None
+    S3_PRIVATE_VIDEOS_BUCKET: str | None = None
 
 
 class MediaSettings(EnvSettings):

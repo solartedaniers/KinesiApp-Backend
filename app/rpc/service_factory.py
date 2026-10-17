@@ -71,7 +71,7 @@ class RpcServiceFactory:
             AuthEmailService(build_email_sender(self._mail_settings), auth_settings.OTP_EXPIRE_MINUTES)
         )
         storage = StorageSettings()
-        self._images = build_signed_storage(storage, self._media_settings, storage.S3_IMAGES_BUCKET)
+        self._images = build_signed_storage(storage, self._media_settings, storage.S3_PRIVATE_IMAGES_BUCKET)
         self._avatar_links = AvatarLinks(self._images)
 
     def registrations(self) -> list[ServicerRegistration]:
