@@ -128,3 +128,20 @@ def test_gender_is_required_and_validated(client, register_and_verify):
     no_gender = {k: v for k, v in PROFILE.items() if k != "gender"}
     assert client.post("/api/v1/athletes/me", json=no_gender, headers=_auth(token)).status_code == 422
     assert client.post("/api/v1/athletes/me", json={**PROFILE, "gender": "x"}, headers=_auth(token)).status_code == 422
+
+
+def test_deleting_managed_athlete_removes_its_videos_from_the_bucket(
+    client, register_and_verify, grant_consent, upload_jump, fake_object_storage
+):
+    coach = register_and_verify("cleanup-coach@kinesiapp.com", role="coach")
+    athlete_id = client.post(
+        "/api/v1/coach/athletes", json={**PROFILE, "full_name": "Lucía"}, headers=_auth(coach)
+    ).json()["id"]
+    grant_consent(coach)
+    assert upload_jump(coach, athlete_id).status_code == 202
+    assert len(fake_object_storage.objects) == 1
+
+    r = client.delete(f"/api/v1/coach/athletes/{athlete_id}", headers=_auth(coach))
+
+    assert r.status_code == 204
+    assert fake_object_storage.objects == {}

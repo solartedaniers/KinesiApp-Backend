@@ -30,20 +30,13 @@ from app.services.jump_analysis_processor import JumpAnalysisProcessor, JumpVide
 from app.services.jump_video_analyzer_factory import get_jump_video_analyzer
 from app.services.jump_analysis_service import JumpAnalysisService
 from app.services.jump_video_storage import JumpVideoStorage
-from app.services.object_storage_factory import get_video_object_storage
-from app.storage.object_storage import ObjectStorage
+from app.services.object_storage_factory import get_jump_video_storage
 
 router = APIRouter(prefix="/jump-analyses", tags=["jump-analyses"])
 
 
-def _get_video_storage(
-    object_storage: ObjectStorage = Depends(get_video_object_storage),
-) -> JumpVideoStorage:
-    return JumpVideoStorage(object_storage, settings.MAX_VIDEO_UPLOAD_BYTES)
-
-
 def get_jump_analysis_service(
-    db: Session = Depends(get_db), video_storage: JumpVideoStorage = Depends(_get_video_storage)
+    db: Session = Depends(get_db), video_storage: JumpVideoStorage = Depends(get_jump_video_storage)
 ) -> JumpAnalysisService:
     return JumpAnalysisService(
         JumpAnalysisRepository(db),
@@ -56,7 +49,7 @@ def get_jump_analysis_service(
 def _get_processor(
     session_factory: sessionmaker[Session] = Depends(get_session_factory),
     analyzer: JumpVideoAnalyzer = Depends(get_jump_video_analyzer),
-    video_storage: JumpVideoStorage = Depends(_get_video_storage),
+    video_storage: JumpVideoStorage = Depends(get_jump_video_storage),
 ) -> JumpAnalysisProcessor:
     return JumpAnalysisProcessor(session_factory, analyzer, video_storage)
 

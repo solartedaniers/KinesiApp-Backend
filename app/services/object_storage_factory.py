@@ -4,6 +4,7 @@ from fastapi import Depends
 
 from app.core.config import Settings, settings
 from app.services.avatar_storage import AvatarStorage
+from app.services.jump_video_storage import JumpVideoStorage
 from app.storage.neon_object_storage import NeonObjectStorage
 from app.storage.object_storage import ObjectStorage, UnconfiguredObjectStorage
 
@@ -35,3 +36,7 @@ def get_image_object_storage() -> ObjectStorage:
 
 def get_avatar_storage(object_storage: ObjectStorage = Depends(get_image_object_storage)) -> AvatarStorage:
     return AvatarStorage(object_storage)
+
+
+def get_jump_video_storage(object_storage: ObjectStorage = Depends(get_video_object_storage)) -> JumpVideoStorage:
+    return JumpVideoStorage(object_storage, settings.MAX_VIDEO_UPLOAD_BYTES)

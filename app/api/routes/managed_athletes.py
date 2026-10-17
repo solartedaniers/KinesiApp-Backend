@@ -8,7 +8,8 @@ from app.repositories.athlete_repository import AthleteRepository
 from app.schemas.athlete import AthleteProfileRead, ManagedAthleteCreate, ManagedAthleteUpdate
 from app.schemas.avatar import AvatarUpload
 from app.services.avatar_storage import AvatarStorage
-from app.services.object_storage_factory import get_avatar_storage
+from app.services.jump_video_storage import JumpVideoStorage
+from app.services.object_storage_factory import get_avatar_storage, get_jump_video_storage
 from app.services.managed_athlete_service import ManagedAthleteService
 
 router = APIRouter(prefix="/coach/athletes", tags=["coach-athletes"])
@@ -54,12 +55,17 @@ def delete_managed_athlete(
     coach: User = Depends(_require_coach),
     service: ManagedAthleteService = Depends(_get_service),
     avatars: AvatarStorage = Depends(get_avatar_storage),
+    videos: JumpVideoStorage = Depends(get_jump_video_storage),
 ) -> None:
-    avatar_url = service.get_owned(coach.id, athlete_id).avatar_url
+    athlete = service.get_owned(coach.id, athlete_id)
+    avatar_url = athlete.avatar_url
+    video_urls = [analysis.video_reference for analysis in athlete.jump_analyses]
     service.delete(coach.id, athlete_id)
-    # Después de borrar la fila: si falla, sólo queda un objeto huérfano
+    # Después de borrar las filas: si falla, sólo quedan objetos huérfanos
     if avatar_url is not None:
         avatars.delete(avatar_url)
+    for video_url in video_urls:
+        videos.delete(video_url)
 
 
 @router.put("/{athlete_id}/avatar", response_model=AthleteProfileRead)
