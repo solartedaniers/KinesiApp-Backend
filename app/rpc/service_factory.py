@@ -4,6 +4,7 @@ from functools import partial
 
 import grpc
 from kinesiapp.account.v1 import account_pb2_grpc
+from kinesiapp.admin.v1 import user_admin_pb2_grpc
 from kinesiapp.auth.v1 import auth_pb2_grpc
 from kinesiapp.system.v1 import system_pb2_grpc
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -12,6 +13,11 @@ from app.account.account_profile import AccountProfile
 from app.account.avatar_management import AvatarManagement
 from app.account.inputs import AccountInputRules
 from app.account.video_consent import VideoConsent
+from app.admin.inputs import AdminInputRules
+from app.admin.user_activation import UserActivation
+from app.admin.user_directory import UserDirectory
+from app.admin.user_provisioning import UserProvisioning
+from app.admin.user_role_assignment import UserRoleAssignment
 from app.ai.lifecycle import UnavailableAiLifecycle
 from app.auth.auth_mailer import ThreadedAuthMailer
 from app.auth.email_verification import EmailVerification
@@ -25,6 +31,7 @@ from app.auth.registration import Registration
 from app.auth.session_issuer import SessionIssuer
 from app.auth.session_management import SessionManagement
 from app.auth.session_tokens import SessionTokenService
+from app.core.pagination import PageRules
 from app.identity.password_policy import PasswordPolicy
 from app.mail.auth_email_service import AuthEmailService
 from app.mail.sender_factory import build_email_sender
@@ -33,11 +40,13 @@ from app.rpc.account_servicer import AccountServicer
 from app.rpc.auth_servicer import AuthServicer
 from app.rpc.client_policy import build_client_policy
 from app.rpc.system_servicer import SystemServicer
+from app.rpc.user_admin_servicer import UserAdminServicer
 from app.services.email_domain_checker import EmailDomainChecker
 from app.settings.athlete import AthleteSettings
 from app.settings.auth import AuthSettings, PasswordPolicySettings
 from app.settings.chat import ChatSettings
 from app.settings.mail import MailSettings
+from app.settings.pagination import PaginationSettings
 from app.settings.storage import MediaSettings, StorageSettings
 from app.storage.avatar_links import AvatarLinks
 from app.storage.signed_storage_factory import build_signed_storage
@@ -63,6 +72,7 @@ class RpcServiceFactory:
             partial(system_pb2_grpc.add_SystemServiceServicer_to_server, self._system()),
             partial(auth_pb2_grpc.add_AuthServiceServicer_to_server, self._auth()),
             partial(account_pb2_grpc.add_AccountServiceServicer_to_server, self._account()),
+            partial(user_admin_pb2_grpc.add_UserAdminServiceServicer_to_server, self._user_admin()),
         ]
 
     @staticmethod
@@ -106,5 +116,16 @@ class RpcServiceFactory:
             AccountProfile(self._uow_factory),
             AvatarManagement(self._uow_factory, self._images, tickets, media.MAX_AVATAR_UPLOAD_BYTES),
             VideoConsent(self._uow_factory, media.VIDEO_CONSENT_VERSION),
+            self._avatar_links,
+        )
+
+    def _user_admin(self) -> UserAdminServicer:
+        return UserAdminServicer(
+            AdminInputRules(self._password_policy),
+            PageRules.from_settings(PaginationSettings()),
+            UserProvisioning(self._uow_factory, PasswordHasher()),
+            UserDirectory(self._uow_factory),
+            UserRoleAssignment(self._uow_factory),
+            UserActivation(self._uow_factory),
             self._avatar_links,
         )

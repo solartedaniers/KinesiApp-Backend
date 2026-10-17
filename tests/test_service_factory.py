@@ -25,4 +25,5 @@ def test_factory_registers_every_migrated_service() -> None:
         "kinesiapp.system.v1.SystemService",
         "kinesiapp.auth.v1.AuthService",
         "kinesiapp.account.v1.AccountService",
+        "kinesiapp.admin.v1.UserAdminService",
     ]
