@@ -22,7 +22,7 @@ class RefreshRequest(BaseModel):
 
 class OTPVerifyRequest(BaseModel):
     email: EmailStr
-    code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+    code: str = Field(pattern=rf"^\d{{{settings.OTP_LENGTH}}}$")
 
 
 class PasswordResetRequest(BaseModel):

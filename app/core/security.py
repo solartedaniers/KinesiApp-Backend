@@ -45,8 +45,8 @@ def verify_otp_code(code: str, code_hash: str) -> bool:
 
 
 def generate_otp_code() -> str:
-    # 6 dígitos numéricos: suficiente entropía para un código de un solo uso de vida corta
-    return f"{secrets.randbelow(1_000_000):06d}"
+    # Solo dígitos: bastan para un código de un solo uso de vida corta y con intentos limitados
+    return f"{secrets.randbelow(10**settings.OTP_LENGTH):0{settings.OTP_LENGTH}d}"
 
 
 def hash_token(raw_token: str) -> str:

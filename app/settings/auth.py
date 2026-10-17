@@ -13,6 +13,8 @@ class AuthSettings(EnvSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=15, gt=0)
     REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7, gt=0)
     OTP_EXPIRE_MINUTES: int = Field(gt=0)
+    # Dígitos del código de verificación y de recuperación
+    OTP_LENGTH: int = Field(default=6, ge=4, le=10)
     OTP_MAX_ATTEMPTS: int = Field(default=5, gt=0)
 
 
