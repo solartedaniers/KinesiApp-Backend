@@ -37,7 +37,7 @@ static_resources:
   clusters:
     - name: grpc_backend
       type: STATIC
-      connect_timeout: 1s
+      connect_timeout: __ENVOY_CONNECT_TIMEOUT__
       load_assignment:
         cluster_name: grpc_backend
         endpoints:
