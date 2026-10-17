@@ -1,29 +1,27 @@
 from dataclasses import dataclass
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal
 
 from pydantic import BaseModel, EmailStr, Field, ValidationInfo, field_validator
 
+from app.core.input_rules import InputModel, parse_input, rules_of
 from app.identity.password_policy import PasswordPolicy
 from app.models.user import UserRole
 from app.schemas.person_name import PersonName
 
-InputModel = TypeVar("InputModel", bound=BaseModel)
-_RULES = "auth_rules"
-
 
 @dataclass(frozen=True)
 class AuthInputRules:
-    """Reglas que salen de la configuración; llegan a los validadores por el contexto de Pydantic."""
+    """Reglas de las peticiones de autenticación que salen de la configuración."""
 
     password_policy: PasswordPolicy
     otp_length: int
 
     def parse(self, model: type[InputModel], data: dict[str, Any]) -> InputModel:
-        return model.model_validate(data, context={_RULES: self})
+        return parse_input(model, data, self)
 
 
 def _rules(info: ValidationInfo) -> AuthInputRules:
-    return info.context[_RULES]
+    return rules_of(info, AuthInputRules)
 
 
 def _strong_password(value: str, info: ValidationInfo) -> str:
