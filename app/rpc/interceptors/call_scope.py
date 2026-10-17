@@ -11,7 +11,7 @@ StreamBehavior = Callable[[Any, grpc.aio.ServicerContext], AsyncIterator[Any]]
 
 
 class CallScopeInterceptor(grpc.aio.ServerInterceptor, ABC):
-    """Template Method: cada interceptor solo define qué pasa alrededor de una llamada, sea unaria o de stream."""
+    """Template Method: dejo que cada interceptor defina solo qué pasa alrededor de una llamada, unaria o de stream."""
 
     @abstractmethod
     def scope(self, method: str, context: grpc.aio.ServicerContext) -> AbstractAsyncContextManager[None]: ...
@@ -35,7 +35,7 @@ class CallScopeInterceptor(grpc.aio.ServerInterceptor, ABC):
     def _wrap_unary(self, method: str, behavior: UnaryBehavior) -> UnaryBehavior:
         async def wrapped(request: Any, context: grpc.aio.ServicerContext) -> Any:
             async with self.scope(method, context):
-                # Los servicers base generados son síncronos (responden UNIMPLEMENTED); los míos, async
+                # Distingo los dos casos porque los servicers base generados son síncronos (responden UNIMPLEMENTED)
                 result = behavior(request, context)
                 return await result if inspect.isawaitable(result) else result
 

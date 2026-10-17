@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class ErrorInterceptor(CallScopeInterceptor):
-    """Traduce las excepciones de los handlers a status gRPC con google.rpc.ErrorInfo en los detalles."""
+    """Traduzco las excepciones de los handlers a status gRPC con google.rpc.ErrorInfo en los detalles."""
 
     @asynccontextmanager
     async def scope(self, method: str, context: grpc.aio.ServicerContext) -> AsyncIterator[None]:
@@ -43,7 +43,7 @@ class ErrorInterceptor(CallScopeInterceptor):
         except NotImplementedError:
             await context.abort(grpc.StatusCode.UNIMPLEMENTED, "Method not implemented")
         except Exception:
-            # El detalle queda en el log; al cliente no le filtro nada interno
+            # Dejo el detalle en el log; al cliente no le filtro nada interno
             logger.exception("Unhandled error in %s", method)
             await context.abort(grpc.StatusCode.INTERNAL, "Internal error")
 

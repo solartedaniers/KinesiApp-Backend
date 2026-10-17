@@ -10,7 +10,7 @@ from app.ai.lifecycle import AiLifecycle
 
 
 class SystemServicer(system_pb2_grpc.SystemServiceServicer):
-    """kinesiapp.system.v1.SystemService: transporte, política del cliente y despertar de la IA."""
+    """Implemento kinesiapp.system.v1.SystemService: transporte, política del cliente y despertar de la IA."""
 
     def __init__(
         self,

@@ -16,7 +16,7 @@ from app.storage.avatar_links import AvatarLinks
 
 
 class UserAdminServicer(user_admin_pb2_grpc.UserAdminServiceServicer):
-    """kinesiapp.admin.v1.UserAdminService: el contrato ya restringe cada RPC al rol ADMIN."""
+    """Implemento kinesiapp.admin.v1.UserAdminService; el contrato ya restringe cada RPC al rol ADMIN."""
 
     def __init__(
         self,

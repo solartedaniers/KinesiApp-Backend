@@ -11,7 +11,7 @@ from app.settings.pagination import PaginationSettings
 
 @dataclass(frozen=True)
 class PageRules:
-    """Tamaños de página de los listados por cursor, compartidos por todos los servicios."""
+    """Fijo los tamaños de página de los listados por cursor; los comparten todos los servicios."""
 
     default_size: int
     max_size: int
@@ -43,7 +43,7 @@ class PageInput(BaseModel):
 
 
 def encode_page_token(last_id: int) -> str:
-    # Opaco para que el cliente no arme cursores a mano, pero sin estado en el servidor
+    # Lo hago opaco para que el cliente no arme cursores a mano, sin guardar estado en el servidor
     return base64.urlsafe_b64encode(str(last_id).encode()).decode()
 
 

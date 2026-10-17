@@ -23,7 +23,7 @@ from app.rpc.user_roles import role_from_proto
 
 
 class AuthServicer(auth_pb2_grpc.AuthServiceServicer):
-    """kinesiapp.auth.v1.AuthService: traduce cada RPC al caso de uso que le corresponde."""
+    """Implemento kinesiapp.auth.v1.AuthService y traduzco cada RPC al caso de uso que le corresponde."""
 
     def __init__(
         self,

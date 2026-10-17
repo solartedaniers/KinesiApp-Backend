@@ -12,7 +12,7 @@ class AiState(str, enum.Enum):
 
 
 class AiLifecycle(Protocol):
-    """Despierta el servicio de IA. Si no responde, lanza DomainError con AI_UNAVAILABLE."""
+    """Despierto el servicio de IA; si no responde, lanzo DomainError con AI_UNAVAILABLE."""
 
     async def wake_up(self) -> AiState: ...
 

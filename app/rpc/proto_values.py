@@ -24,5 +24,5 @@ def upload_target(upload: PresignedUpload) -> storage_pb2.UploadTarget:
 
 
 def image_format_from_proto(content_type: storage_pb2.ImageContentType.ValueType) -> ImageFormat | None:
-    # None para IMAGE_CONTENT_TYPE_UNSPECIFIED: el validador de la petición lo reporta como campo inválido
+    # Devuelvo None para IMAGE_CONTENT_TYPE_UNSPECIFIED y el validador lo reporta como campo inválido
     return ImageFormat.__members__.get(storage_pb2.ImageContentType.Name(content_type).removeprefix(_IMAGE_PREFIX))

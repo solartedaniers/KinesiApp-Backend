@@ -4,7 +4,7 @@ from kinesiapp.common.v1.errors_pb2 import ErrorReason
 ERROR_DOMAIN = "kinesiapp"
 _REASON_PREFIX = "ERROR_REASON_"
 
-# Único lugar donde un motivo de negocio se vuelve status code; sigue lo anotado en errors.proto
+# Aquí, y solo aquí, convierto un motivo de negocio en status code, como lo anota errors.proto
 STATUS_BY_REASON: dict[ErrorReason.ValueType, StatusCode] = {
     ErrorReason.ERROR_REASON_BAD_REQUEST: StatusCode.INVALID_ARGUMENT,
     ErrorReason.ERROR_REASON_NOT_FOUND: StatusCode.NOT_FOUND,

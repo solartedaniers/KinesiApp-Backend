@@ -1,4 +1,4 @@
-"""Servidor gRPC asíncrono del backend. Uso: python -m app.rpc.server (con generated/ en PYTHONPATH)."""
+"""Arranco el servidor gRPC asíncrono con python -m app.rpc.server (con generated/ en PYTHONPATH)."""
 
 import asyncio
 import contextlib
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_interceptors(verifier: AccessTokenVerifier) -> list[grpc.aio.ServerInterceptor]:
-    # El orden importa: logging ve el status final y el de errores traduce también los rechazos de auth
+    # Pongo logging primero para que vea el status final, y errores antes de auth para traducir sus rechazos
     return [LoggingInterceptor(), ErrorInterceptor(), AuthInterceptor(verifier)]
 
 
@@ -48,7 +48,7 @@ async def serve(settings: GrpcServerSettings, auth_settings: AuthSettings, datab
     logger.info("gRPC server listening on %s:%s", settings.HOST, settings.PORT)
 
     stopping = asyncio.Event()
-    # Render detiene el contenedor con SIGTERM; en Windows no existe add_signal_handler y basta Ctrl+C
+    # Escucho SIGTERM porque así detiene Render el contenedor; en Windows no existe y basta Ctrl+C
     with contextlib.suppress(NotImplementedError):
         asyncio.get_running_loop().add_signal_handler(signal.SIGTERM, stopping.set)
     try:

@@ -14,7 +14,7 @@ _BEARER_PREFIX = "bearer "
 
 
 class AuthInterceptor(CallScopeInterceptor):
-    """Aplica la política de acceso del contrato con el token Bearer de la metadata "authorization"."""
+    """Aplico la política de acceso del contrato con el token Bearer de la metadata "authorization"."""
 
     def __init__(self, verifier: AccessTokenVerifier) -> None:
         self._verifier = verifier

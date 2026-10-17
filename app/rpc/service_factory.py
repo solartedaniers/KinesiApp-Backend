@@ -56,7 +56,7 @@ ServicerRegistration = Callable[[grpc.aio.Server], None]
 
 
 class RpcServiceFactory:
-    """Factory: arma cada servicer con sus dependencias a partir de la configuración de su dominio."""
+    """Factory: armo cada servicer con sus dependencias a partir de la configuración de su dominio."""
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession], auth_settings: AuthSettings) -> None:
         self._uow_factory = partial(UnitOfWork, session_factory)
@@ -64,7 +64,7 @@ class RpcServiceFactory:
         self._media_settings = MediaSettings()
         self._password_policy = PasswordPolicy(PasswordPolicySettings())
         self._mail_settings = MailSettings()
-        # Auth y admin comparten el hasher, los códigos y el correo: los dos emiten códigos de verificación
+        # Comparto el hasher, los códigos y el correo entre auth y admin: los dos emiten códigos de verificación
         self._hasher = PasswordHasher()
         self._codes = OneTimeCodes(auth_settings, self._hasher)
         self._mailer = ThreadedAuthMailer(

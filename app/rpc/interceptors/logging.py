@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class LoggingInterceptor(CallScopeInterceptor):
-    """Registra método, status code y duración de cada llamada."""
+    """Registro método, status code y duración de cada llamada."""
 
     @asynccontextmanager
     async def scope(self, method: str, context: grpc.aio.ServicerContext) -> AsyncIterator[None]:

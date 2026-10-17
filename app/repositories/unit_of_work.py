@@ -9,7 +9,7 @@ from app.repositories.async_user_repository import AsyncUserRepository
 
 
 class UnitOfWork:
-    """Una sesión y una transacción por caso de uso: los repositorios comparten la sesión y commit confirma todo."""
+    """Abro una sesión y una transacción por caso de uso: los repositorios la comparten y commit confirma todo."""
 
     users: AsyncUserRepository
     refresh_tokens: AsyncRefreshTokenRepository
@@ -28,7 +28,7 @@ class UnitOfWork:
     async def __aexit__(
         self, exc_type: type[BaseException] | None, exc: BaseException | None, traceback: TracebackType | None
     ) -> None:
-        # Lo que no se confirmó con commit se descarta, también si el caso de uso falló a mitad.
+        # Descarto lo que no se confirmó con commit, también si el caso de uso falló a mitad.
         # Separo antes las instancias porque el rollback las expira y el caso de uso ya las devolvió
         self._session.expunge_all()
         await self._session.rollback()

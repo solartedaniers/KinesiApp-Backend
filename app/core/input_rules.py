@@ -8,7 +8,7 @@ _RULES = "rules"
 
 
 def parse_input(model: type[InputModel], data: dict[str, Any], rules: object) -> InputModel:
-    # Las reglas salen de la configuración, así que llegan a los validadores por el contexto y no como constantes
+    # Paso las reglas por el contexto y no como constantes porque salen de la configuración
     return model.model_validate(data, context={_RULES: rules})
 
 

@@ -8,7 +8,7 @@ ModelType = TypeVar("ModelType", bound=Base)
 
 
 class AsyncBaseRepository(Generic[ModelType]):
-    """Acceso a datos genérico sobre una sesión asíncrona: cada repositorio concreto solo fija su modelo."""
+    """Doy acceso a datos genérico sobre una sesión asíncrona: cada repositorio concreto solo fija su modelo."""
 
     def __init__(self, session: AsyncSession, model: type[ModelType]) -> None:
         self._session = session
@@ -18,9 +18,9 @@ class AsyncBaseRepository(Generic[ModelType]):
         return await self._session.get(self._model, entity_id)
 
     def add(self, entity: ModelType) -> None:
-        # Sin commit: lo hace la unidad de trabajo, para que un caso de uso confirme todo o nada
+        # No hago commit: lo hace la unidad de trabajo, para que un caso de uso confirme todo o nada
         self._session.add(entity)
 
     async def refresh(self, entity: ModelType) -> None:
-        # Trae lo que pone la base (id, created_at) antes de que la unidad de trabajo suelte la instancia
+        # Traigo lo que pone la base (id, created_at) antes de que la unidad de trabajo suelte la instancia
         await self._session.refresh(entity)

@@ -13,7 +13,7 @@ from app.storage.avatar_links import AvatarLinks
 
 
 class AccountServicer(account_pb2_grpc.AccountServiceServicer):
-    """kinesiapp.account.v1.AccountService: la cuenta de quien llama, sea cual sea su rol."""
+    """Implemento kinesiapp.account.v1.AccountService: la cuenta de quien llama, sea cual sea su rol."""
 
     def __init__(
         self,

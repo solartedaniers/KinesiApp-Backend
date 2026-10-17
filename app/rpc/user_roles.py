@@ -6,7 +6,7 @@ _ROLE_PREFIX = "USER_ROLE_"
 
 
 def role_from_proto(role: identity_pb2.UserRole.ValueType) -> UserRole | None:
-    # None para USER_ROLE_UNSPECIFIED: el validador de cada request decide si eso es un error
+    # Devuelvo None para USER_ROLE_UNSPECIFIED y el validador de cada request decide si es un error
     return UserRole.__members__.get(identity_pb2.UserRole.Name(role).removeprefix(_ROLE_PREFIX))
 
 

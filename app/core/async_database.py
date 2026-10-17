@@ -21,5 +21,5 @@ def build_async_engine(settings: DatabaseSettings) -> AsyncEngine:
 
 
 def build_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
-    # Sin expirar al hacer commit: en async, leer un atributo expirado dispararía I/O implícito (MissingGreenlet)
+    # No expiro al hacer commit: en async, leer un atributo expirado dispararía I/O implícito (MissingGreenlet)
     return async_sessionmaker(engine, expire_on_commit=False)
