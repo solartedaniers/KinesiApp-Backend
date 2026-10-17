@@ -21,7 +21,7 @@ class TeamMembership:
         async with self._uow_factory() as uow:
             team = await visible_team(uow, principal, team_id)
             athlete = await existing_athlete(uow, athlete_id)
-            # En el equipo de un coach solo entran sus deportistas, aunque lo edite un admin
+            # En el equipo de un coach solo dejo entrar a sus deportistas, aunque lo edite un admin
             if team.owner.role != UserRole.ADMIN and athlete.coach_id != team.owner_id:
                 raise DomainError(ErrorReason.ERROR_REASON_INVALID_TEAM_MEMBER, "The athlete is not coached by the team owner")
             if athlete_id not in team.athlete_ids:

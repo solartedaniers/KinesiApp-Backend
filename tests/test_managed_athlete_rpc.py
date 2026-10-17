@@ -141,7 +141,7 @@ def test_managed_athlete_avatar_goes_directly_to_the_bucket(tmp_path: Path) -> N
         )
         key = images.signed_uploads[-1][0]
         images.browser_put(key, PNG, "image/png")
-        # Un ticket emitido para un deportista no sirve para la foto de otro, aunque sea del mismo coach
+        # Compruebo que el ticket de un deportista no sirve para la foto de otro, aunque sea del mismo coach
         swapped = await _error_of(
             stub.ConfirmManagedAthleteAvatarUpload(
                 managed_pb2.ConfirmManagedAthleteAvatarUploadRequest(athlete_id=second.id, upload_id=upload.upload_id),

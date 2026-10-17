@@ -39,7 +39,7 @@ class TeamCatalog:
             team = await visible_team(uow, principal, team_id)
             if name == team.name:
                 return team
-            # El nombre es único por dueño, también cuando lo renombra un admin
+            # Compruebo el nombre contra el dueño del equipo, también cuando lo renombra un admin
             await _require_free_name(uow, team.owner_id, name)
             team.name = name
             await _commit_name(uow)
@@ -68,7 +68,7 @@ async def _commit_name(uow: UnitOfWork) -> None:
     try:
         await uow.commit()
     except IntegrityError as error:
-        # La base tiene una restricción única (owner_id, name): dos altas simultáneas con el mismo nombre chocan aquí
+        # Me apoyo en la restricción única (owner_id, name): dos altas simultáneas con el mismo nombre chocan aquí
         raise _name_taken() from error
 
 

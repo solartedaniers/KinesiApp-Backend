@@ -35,6 +35,6 @@ class OwnAthleteProfile:
 async def _own_profile(uow: UnitOfWork, user_id: int) -> AthleteProfile:
     profile = await uow.athletes.get_by_user_id(user_id)
     if profile is None:
-        # El frontend lo trata como "falta el onboarding", no como un fallo
+        # Respondo NOT_FOUND porque el frontend lo trata como "falta el onboarding", no como un fallo
         raise DomainError(ErrorReason.ERROR_REASON_NOT_FOUND, "The athlete profile has not been created yet")
     return profile

@@ -22,7 +22,7 @@ async def open_profile(uow: UnitOfWork, user_id: int, biometrics: BiometricsInpu
     try:
         await uow.commit()
     except IntegrityError as error:
-        # La columna user_id es única: si dos altas llegan a la vez, la segunda choca aquí y no queda duplicada
+        # Me apoyo en que user_id es única: si dos altas llegan a la vez, la segunda choca aquí y no queda duplicada
         raise _profile_exists() from error
     return await existing_athlete(uow, profile.id)
 

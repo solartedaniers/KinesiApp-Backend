@@ -52,7 +52,7 @@ def test_coach_creates_renames_and_deletes_teams_with_unique_names(tmp_path: Pat
         other = await world.user("otro@kinesiapp.com", UserRole.COACH)
         created = (await stub.CreateTeam(team_pb2.CreateTeamRequest(name="  Sub 17 "), metadata=bearer(coach))).team
         duplicate = await _error_of(stub.CreateTeam(team_pb2.CreateTeamRequest(name="Sub 17"), metadata=bearer(coach)))
-        # El nombre es único por dueño: otro coach puede usar el mismo
+        # Compruebo que otro coach sí puede usar el mismo nombre
         await stub.CreateTeam(team_pb2.CreateTeamRequest(name="Sub 17"), metadata=bearer(other))
         blank = await _error_of(stub.CreateTeam(team_pb2.CreateTeamRequest(name="   "), metadata=bearer(coach)))
         await stub.CreateTeam(team_pb2.CreateTeamRequest(name="Arqueros"), metadata=bearer(coach))
@@ -126,7 +126,7 @@ def test_only_the_owner_coach_athletes_join_a_coach_team_and_membership_is_idemp
         await add(coach, coach_team.id, mine.id)
         twice = (await add(coach, coach_team.id, mine.id)).team
         foreign_error = await _error_of(add(coach, coach_team.id, foreign.id))
-        # Aunque edite un admin, en el equipo de un coach mando la regla del dueño
+        # Compruebo que, aunque edite un admin, manda la regla del dueño del equipo
         admin_on_coach_team = await _error_of(add(admin, coach_team.id, foreign.id))
         admin_team_now = (await add(admin, admin_team.id, foreign.id)).team
         missing = await _error_of(add(coach, coach_team.id, 999))

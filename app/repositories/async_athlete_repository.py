@@ -41,7 +41,7 @@ class AsyncAthleteRepository(AsyncBaseRepository[AthleteProfile]):
         query = _with_people().where(
             AthleteProfile.id == athlete_id, AthleteProfile.coach_id == coach_id, AthleteProfile.user_id.is_(None)
         )
-        # Para borrarla, el ORM necesita sus análisis, sus mediciones y sus equipos ya cargados
+        # Cargo sus análisis, sus mediciones y sus equipos porque el ORM los necesita para borrarla en cascada
         query = query.options(
             selectinload(AthleteProfile.jump_analyses).selectinload(JumpAnalysis.angle_measurements),
             selectinload(AthleteProfile.teams),

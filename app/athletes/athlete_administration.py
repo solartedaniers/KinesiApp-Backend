@@ -20,7 +20,7 @@ class AthleteAdministration:
     async def create_for_user(self, user_id: int, biometrics: BiometricsInput) -> AthleteProfile:
         async with self._uow_factory() as uow:
             user = await existing_user(uow, user_id)
-            # La ficha biométrica es de un deportista: un coach o un admin no tienen
+            # No le creo ficha a un coach ni a un admin: la ficha biométrica es solo de deportistas
             if user.role != UserRole.ATHLETE:
                 raise DomainError(ErrorReason.ERROR_REASON_INVALID_ROLE_ASSIGNMENT, "The account is not an athlete")
             return await open_profile(uow, user_id, biometrics)
@@ -32,7 +32,7 @@ class AthleteAdministration:
             if coach.role != UserRole.COACH:
                 raise DomainError(ErrorReason.ERROR_REASON_INVALID_ROLE_ASSIGNMENT, "The account is not a coach")
             athlete.coach_id = coach_id
-            # Sus equipos con el coach anterior ya no le corresponden; los de un admin los conserva
+            # Lo saco de los equipos del coach anterior, que ya no le corresponden; los de un admin los conservo
             await uow.teams.remove_athlete_from_other_coaches_teams(athlete_id, coach_id)
             await uow.commit()
             return await existing_athlete(uow, athlete_id)
