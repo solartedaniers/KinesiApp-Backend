@@ -14,7 +14,7 @@ from grpc_status import rpc_status
 from kinesiapp.auth.v1 import auth_pb2, auth_pb2_grpc
 from kinesiapp.common.v1 import identity_pb2
 from kinesiapp.common.v1.errors_pb2 import ErrorReason
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 import app.models  # noqa: F401  registra todos los modelos en Base.metadata
@@ -34,6 +34,7 @@ from app.core.domain_error import DomainError
 from app.identity.access_tokens import JwtAccessTokenVerifier
 from app.identity.password_policy import PasswordPolicy
 from app.models.base import Base
+from app.models.refresh_token import RefreshToken
 from app.models.user import User, UserRole
 from app.repositories.unit_of_work import UnitOfWork
 from app.rpc.auth_servicer import AuthServicer
@@ -263,6 +264,26 @@ def test_concurrent_wrong_codes_never_exceed_the_attempt_limit(tmp_path: Path) -
     assert reasons == ["INVALID_OTP"] * 12
     assert attempts == 5
     assert late == "INVALID_OTP"
+
+
+def test_concurrent_refreshes_with_the_same_token_open_a_single_session(tmp_path: Path) -> None:
+    async def scenario(backend: _Backend) -> tuple[list[str], int]:
+        first = await backend.registered_and_verified()
+        request = auth_pb2.RefreshSessionRequest(refresh_token=first.refresh_token)
+        outcomes = await asyncio.gather(
+            backend.stub.RefreshSession(request), backend.stub.RefreshSession(request), return_exceptions=True
+        )
+        async with backend.session_factory() as session:
+            active = await session.scalar(
+                select(func.count()).select_from(RefreshToken).where(RefreshToken.revoked_at.is_(None))
+            )
+        return sorted("ok" if isinstance(o, auth_pb2.RefreshSessionResponse) else error_info(o).reason
+                      for o in outcomes), active
+
+    outcomes, active = _run(tmp_path, scenario)
+
+    assert outcomes == ["INVALID_REFRESH_TOKEN", "ok"]
+    assert active == 1
 
 
 def test_refresh_rotates_the_token_and_logout_is_idempotent(tmp_path: Path) -> None:

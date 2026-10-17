@@ -47,11 +47,9 @@ class SessionManagement:
     async def refresh(self, refresh_token: str) -> SessionTokens:
         user_id = self._tokens.refresh_token_subject(refresh_token)
         async with self._uow_factory() as uow:
-            stored = await uow.refresh_tokens.get_by_token_hash(self._tokens.fingerprint(refresh_token))
-            if stored is None or not stored.is_active or stored.user_id != user_id:
-                raise _invalid_refresh_token()
             # Roto el token: el usado queda revocado aunque la renovación falle después
-            uow.refresh_tokens.revoke(stored)
+            if not await uow.refresh_tokens.consume(self._tokens.fingerprint(refresh_token)):
+                raise _invalid_refresh_token()
             user = await uow.users.get(user_id)
             if user is None or not user.is_active:
                 await uow.commit()
@@ -62,11 +60,9 @@ class SessionManagement:
 
     async def logout(self, refresh_token: str) -> None:
         async with self._uow_factory() as uow:
-            stored = await uow.refresh_tokens.get_by_token_hash(self._tokens.fingerprint(refresh_token))
             # Lo hago idempotente: si no existe o ya estaba revocado, el resultado buscado ya se cumple
-            if stored is not None and stored.is_active:
-                uow.refresh_tokens.revoke(stored)
-                await uow.commit()
+            await uow.refresh_tokens.consume(self._tokens.fingerprint(refresh_token))
+            await uow.commit()
 
 
 def _invalid_refresh_token() -> DomainError:
