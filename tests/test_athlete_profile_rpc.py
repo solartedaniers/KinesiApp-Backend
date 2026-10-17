@@ -245,3 +245,17 @@ def test_admin_lists_every_athlete_by_pages(tmp_path: Path) -> None:
                 return pages
 
     assert _run(tmp_path, scenario) == [["Persona Prueba"] * 2, ["Persona Prueba", "Gestionado Uno"]]
+
+
+def test_simultaneous_onboardings_leave_a_single_profile(tmp_path: Path) -> None:
+    async def scenario(world: World, stub):
+        ana = await world.user("ana@kinesiapp.com")
+        request = profiles_pb2.CreateMyAthleteProfileRequest(biometrics=_biometrics())
+        outcomes = await asyncio.gather(
+            *(stub.CreateMyAthleteProfile(request, metadata=bearer(ana)) for _ in range(5)), return_exceptions=True
+        )
+        return sorted(
+            "ok" if isinstance(o, profiles_pb2.CreateMyAthleteProfileResponse) else error_info(o).reason for o in outcomes
+        )
+
+    assert _run(tmp_path, scenario) == [*["PROFILE_ALREADY_EXISTS"] * 4, "ok"]
