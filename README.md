@@ -15,7 +15,7 @@ pip install -r requirements-dev.txt
 curl -L -o models/pose_landmarker_full.task   https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/1/pose_landmarker_full.task
 curl -L -o models/yolo11n.onnx   https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n.onnx
 
-# 1. Point the root .env at Neon (no local Postgres anymore): POSTGRES_HOST/PORT/USER/PASSWORD/DB
+# 1. Point KinesiApp-Backend/.env at Neon (no local Postgres anymore): POSTGRES_HOST/PORT/USER/PASSWORD/DB
 #    from Neon's DIRECT connection string (host without "-pooler"), see .env.example.
 #    libpq reads PGSSLMODE from the process environment, not from .env:
 export PGSSLMODE=require          # PowerShell: $env:PGSSLMODE="require"
@@ -119,5 +119,5 @@ Or run the deployable container: Envoy listens on `$PORT`, translates gRPC-Web (
 
 ```bash
 docker build -f deploy/grpc/Dockerfile -t kinesiapp-grpc .
-docker run --rm --env-file ../.env -e PORT=10000 -p 10000:10000 kinesiapp-grpc
+docker run --rm --env-file .env -e PORT=10000 -p 10000:10000 kinesiapp-grpc
 ```

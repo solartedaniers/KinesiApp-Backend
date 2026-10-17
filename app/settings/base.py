@@ -2,8 +2,8 @@ from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# El .env sigue en la raíz del espacio de trabajo, donde lo dejó el antiguo monorepo
-ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
+# Cada repo lee su propio .env, en la raíz de KinesiApp-Backend
+ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
 
 
 class EnvSettings(BaseSettings):
