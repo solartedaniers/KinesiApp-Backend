@@ -9,7 +9,7 @@ from app.repositories.unit_of_work import UnitOfWork
 
 
 class UserRoleAssignment:
-    """Único camino para volverse COACH o ADMIN: un admin autenticado cambia el rol de otra cuenta."""
+    """Cambio el rol de otra cuenta a pedido de un admin: es el único camino para volverse COACH o ADMIN."""
 
     def __init__(self, uow_factory: Callable[[], UnitOfWork]) -> None:
         self._uow_factory = uow_factory
@@ -17,7 +17,7 @@ class UserRoleAssignment:
     async def assign(self, admin_id: int, user_id: int, role: UserRole) -> User:
         async with self._uow_factory() as uow:
             user = await other_user(uow, admin_id, user_id)
-            # Un coach que deja de serlo dejaría huérfanos a sus deportistas gestionados
+            # No dejo que un coach con deportistas gestionados deje de serlo: quedarían huérfanos
             leaves_coaching = user.role == UserRole.COACH and role != UserRole.COACH
             if leaves_coaching and await uow.athletes.count_by_coach(user.id):
                 raise DomainError(

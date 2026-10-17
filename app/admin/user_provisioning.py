@@ -36,7 +36,7 @@ class UserProvisioning:
                 hashed_password=await self._hasher.hash(data.password),
                 full_name=data.full_name,
                 role=data.role,
-                # Igual que en el registro: la verificación del correo es la que activa la cuenta
+                # Como en el registro, dejo que sea la verificación del correo la que active la cuenta
                 is_active=False,
                 is_verified=False,
             )
@@ -44,6 +44,6 @@ class UserProvisioning:
             uow.users.add(user)
             await uow.commit()
             await uow.users.refresh(user)
-        # Si el correo falla la cuenta ya existe, y su dueño puede pedir otro código desde el login
+        # Envío después del commit: si el correo falla, la cuenta ya existe y su dueño pide otro código
         await self._mailer.send_verification_code(user.email, code)
         return user

@@ -23,7 +23,7 @@ class AvatarUpload:
 
 
 class AvatarManagement:
-    """Avatar de la propia cuenta: el navegador lo sube directo al bucket y aquí solo firmo y verifico."""
+    """Manejo el avatar de la propia cuenta: el navegador lo sube directo al bucket y yo solo firmo y verifico."""
 
     def __init__(
         self,
@@ -50,7 +50,7 @@ class AvatarManagement:
         async with self._uow_factory() as uow:
             user = await own_account(uow, user_id)
             previous_url = user.avatar_url
-            # Confirmar dos veces la misma subida no debe borrar la foto que acaba de quedar
+            # Si confirman dos veces la misma subida, no borro la foto que acaba de quedar
             if previous_url == new_url:
                 return user
             user.avatar_url = new_url
@@ -78,12 +78,12 @@ class AvatarManagement:
             and image_format.matches(await self._storage.read_head(ticket.key, SIGNATURE_LENGTH))
         )
         if not valid:
-            # El objeto inválido no se queda en el bucket ocupando espacio
+            # Borro el objeto inválido para que no se quede ocupando espacio en el bucket
             await self._storage.delete(ticket.key)
             raise DomainError(ErrorReason.ERROR_REASON_INVALID_IMAGE, "The file is not the declared image")
 
     async def _discard(self, object_url: str | None) -> None:
-        # Después de confirmar la base: si falla, solo queda un objeto huérfano, nunca una URL rota
+        # Borro después de confirmar la base: si falla, solo queda un objeto huérfano, nunca una URL rota
         if object_url is None:
             return
         try:

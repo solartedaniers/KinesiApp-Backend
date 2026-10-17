@@ -11,12 +11,12 @@ from app.repositories.unit_of_work import UnitOfWork
 @dataclass(frozen=True)
 class UserPage:
     users: list[User]
-    # None cuando no quedan más cuentas después de esta página
+    # Lo dejo en None cuando no quedan más cuentas después de esta página
     last_id: int | None
 
 
 class UserDirectory:
-    """Consulta de cuentas para el admin: una por id o todas por páginas."""
+    """Le muestro al admin las cuentas: una por id o todas por páginas."""
 
     def __init__(self, uow_factory: Callable[[], UnitOfWork]) -> None:
         self._uow_factory = uow_factory
@@ -42,7 +42,7 @@ async def existing_user(uow: UnitOfWork, user_id: int) -> User:
 
 
 async def other_user(uow: UnitOfWork, admin_id: int, user_id: int) -> User:
-    # Ningún admin se cambia el rol ni se desactiva a sí mismo: evita quedarse sin administradores
+    # No dejo que un admin se cambie el rol ni se desactive a sí mismo: así nunca faltan administradores
     if user_id == admin_id:
         raise DomainError(ErrorReason.ERROR_REASON_CANNOT_MODIFY_OWN_ACCOUNT, "You cannot modify your own account")
     return await existing_user(uow, user_id)

@@ -8,12 +8,12 @@ from app.core.domain_error import DomainError
 from app.models.user import User, UserRole
 from app.repositories.unit_of_work import UnitOfWork
 
-# Solo quien sube videos: el deportista, o el coach por sus deportistas gestionados
+# Lo pido solo a quien sube videos: el deportista, o el coach por sus deportistas gestionados
 _ROLES_THAT_UPLOAD = frozenset({UserRole.ATHLETE, UserRole.COACH})
 
 
 class VideoConsent:
-    """Registra que quien llama aceptó el texto vigente de consentimiento de video."""
+    """Registro que quien llama aceptó el texto vigente de consentimiento de video."""
 
     def __init__(self, uow_factory: Callable[[], UnitOfWork], current_version: int) -> None:
         self._uow_factory = uow_factory

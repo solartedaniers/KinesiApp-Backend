@@ -8,7 +8,7 @@ from app.repositories.unit_of_work import UnitOfWork
 
 
 class AccountProfile:
-    """Lee la cuenta de quien llama y edita su nombre."""
+    """Leo la cuenta de quien llama y edito su nombre."""
 
     def __init__(self, uow_factory: Callable[[], UnitOfWork]) -> None:
         self._uow_factory = uow_factory
@@ -26,7 +26,7 @@ class AccountProfile:
 
 
 async def own_account(uow: UnitOfWork, user_id: int) -> User:
-    # El interceptor ya validó la cuenta; solo falta si la borraron entre tanto
+    # El interceptor ya validó la cuenta, pero la reviso por si la borraron entre tanto
     user = await uow.users.get(user_id)
     if user is None:
         raise DomainError(ErrorReason.ERROR_REASON_NOT_FOUND, "The account does not exist")

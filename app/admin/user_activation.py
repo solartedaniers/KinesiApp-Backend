@@ -6,7 +6,7 @@ from app.repositories.unit_of_work import UnitOfWork
 
 
 class UserActivation:
-    """Activa o desactiva otra cuenta sin borrar sus datos."""
+    """Activo o desactivo otra cuenta sin borrar sus datos."""
 
     def __init__(self, uow_factory: Callable[[], UnitOfWork]) -> None:
         self._uow_factory = uow_factory

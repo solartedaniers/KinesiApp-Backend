@@ -10,7 +10,7 @@ from app.core.domain_error import DomainError
 @dataclass(frozen=True)
 class PresignedUpload:
     url: str
-    # Headers que el PUT del navegador debe llevar tal cual porque forman parte de la firma
+    # Devuelvo estos headers porque forman parte de la firma: el PUT del navegador debe llevarlos tal cual
     headers: dict[str, str]
     expires_at: datetime
 
@@ -28,14 +28,14 @@ class StoredObject:
 
 
 class SignedObjectStorage(Protocol):
-    """Bucket privado: el navegador sube y lee con URLs firmadas; el servidor solo firma y verifica.
+    """Represento un bucket privado: el navegador sube y lee con URLs firmadas; yo solo firmo y verifico.
 
     En la base guardo la URL canónica del objeto (sin firma), la misma que guardaba el REST.
     """
 
     def url_for(self, key: str) -> str: ...
 
-    # ValueError si la URL no es de este bucket
+    # Espero ValueError si la URL no es de este bucket
     def key_from_url(self, object_url: str) -> str: ...
 
     def presign_upload(self, key: str, content_type: str, content_length: int) -> PresignedUpload: ...
@@ -54,7 +54,7 @@ def storage_unavailable() -> DomainError:
 
 
 class UnconfiguredSignedStorage:
-    """Sin credenciales del bucket: todo responde STORAGE_UNAVAILABLE en vez de impedir que arranque el servidor."""
+    """La uso sin credenciales del bucket: respondo STORAGE_UNAVAILABLE en vez de impedir que arranque el servidor."""
 
     def url_for(self, key: str) -> str:
         raise storage_unavailable()

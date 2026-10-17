@@ -2,7 +2,7 @@ import enum
 
 
 class ImageFormat(enum.Enum):
-    """Formatos de imagen admitidos para avatares, con su tipo MIME y la extensión de la clave del objeto."""
+    """Enumero los formatos de imagen admitidos para avatares, con su tipo MIME y la extensión de la clave."""
 
     JPEG = ("image/jpeg", ".jpg")
     PNG = ("image/png", ".png")
@@ -17,7 +17,7 @@ class ImageFormat(enum.Enum):
         return next(image_format for image_format in cls if image_format.mime_type == mime_type)
 
     def matches(self, head: bytes) -> bool:
-        # Magic bytes: el tipo declarado debe coincidir con el contenido real
+        # Comparo los magic bytes: el tipo declarado debe coincidir con el contenido real
         if self is ImageFormat.JPEG:
             return head.startswith(b"\xff\xd8\xff")
         if self is ImageFormat.PNG:
@@ -25,5 +25,5 @@ class ImageFormat(enum.Enum):
         return head[:4] == b"RIFF" and head[8:12] == b"WEBP"
 
 
-# Bytes iniciales que bastan para reconocer cualquiera de los formatos
+# Con estos bytes iniciales reconozco cualquiera de los formatos
 SIGNATURE_LENGTH = 12

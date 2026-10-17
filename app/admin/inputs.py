@@ -21,7 +21,7 @@ class NewUserInput(BaseModel):
     email: EmailStr
     password: str
     full_name: PersonName
-    # Como en el registro público: ADMIN solo se asigna después, cambiando el rol
+    # Como en el registro público, aquí no admito ADMIN: ese rol solo se asigna después, cambiando el rol
     role: Literal[UserRole.ATHLETE, UserRole.COACH]
 
     @field_validator("password")

@@ -34,7 +34,7 @@ class _TicketClaims(BaseModel):
 
 
 class UploadTicketService:
-    """El upload_id es un JWT firmado con lo que se autorizó subir: así no guardo subidas pendientes en la base."""
+    """Uso como upload_id un JWT firmado con lo que autoricé subir: así no guardo subidas pendientes en la base."""
 
     def __init__(self, settings: AuthSettings, lifetime_seconds: int) -> None:
         self._secret = settings.JWT_SECRET_KEY.get_secret_value()
@@ -58,7 +58,7 @@ class UploadTicketService:
             claims = _TicketClaims.model_validate(jwt.decode(upload_id, self._secret, algorithms=[self._algorithm]))
         except (jwt.PyJWTError, ValidationError) as error:
             raise _upload_not_found() from error
-        # Un ticket de otra persona o de otro tipo de archivo se trata igual que uno inexistente
+        # Trato un ticket de otra persona o de otro tipo de archivo igual que uno inexistente
         if claims.sub != owner_id or claims.purpose is not purpose:
             raise _upload_not_found()
         return UploadTicket(owner_id, purpose, claims.key, claims.content_type, claims.content_length)

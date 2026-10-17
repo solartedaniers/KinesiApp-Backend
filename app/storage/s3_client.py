@@ -9,6 +9,6 @@ def build_s3_client(endpoint_url: str, region: str, access_key_id: str, secret_a
         region_name=region,
         aws_access_key_id=access_key_id,
         aws_secret_access_key=secret_access_key,
-        # Neon sólo publica URLs path-style: su certificado no cubre <bucket>.<endpoint>
+        # Uso path-style porque Neon solo publica esas URLs: su certificado no cubre <bucket>.<endpoint>
         config=Config(s3={"addressing_style": "path"}, signature_version="s3v4"),
     )

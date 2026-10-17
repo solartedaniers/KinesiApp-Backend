@@ -15,7 +15,7 @@ _STORAGE_ERRORS = (BotoCoreError, ClientError, Boto3Error)
 
 
 class NeonSignedStorage:
-    """Adapter sobre el S3 de Neon. boto3 es bloqueante: cada llamada de red va en un hilo."""
+    """Adapter sobre el S3 de Neon. boto3 es bloqueante, así que hago cada llamada de red en un hilo."""
 
     def __init__(
         self, client, endpoint_url: str, bucket: str, upload_expires_seconds: int, read_expires_seconds: int
@@ -30,14 +30,14 @@ class NeonSignedStorage:
         return self._base_url + quote(key)
 
     def key_from_url(self, object_url: str) -> str:
-        # Una referencia vieja o manipulada nunca puede tocar objetos fuera de este bucket
+        # Rechazo referencias viejas o manipuladas para no tocar nunca objetos fuera de este bucket
         if not object_url.startswith(self._base_url):
             raise ValueError(f"URL does not belong to bucket '{self._bucket}'")
         return unquote(object_url.removeprefix(self._base_url))
 
     # Firmar es un cálculo local con las credenciales: no sale a la red, así que no necesita hilo
     def presign_upload(self, key: str, content_type: str, content_length: int) -> PresignedUpload:
-        # Content-Length va en la firma: el bucket rechaza un archivo de otro tamaño
+        # Meto el Content-Length en la firma para que el bucket rechace un archivo de otro tamaño
         params = {"Bucket": self._bucket, "Key": key, "ContentType": content_type, "ContentLength": content_length}
         url = self._client.generate_presigned_url("put_object", Params=params, ExpiresIn=self._upload_expires)
         return PresignedUpload(url=url, headers={"Content-Type": content_type}, expires_at=_after(self._upload_expires))
