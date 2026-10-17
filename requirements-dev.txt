@@ -1,4 +1,5 @@
 -r requirements.txt
+-r requirements-grpc.txt
 pytest==8.3.4
 httpx==0.28.1
 # tests/pose_fixtures.py lo importa directo; misma versión que fija kinesiapp-ai
