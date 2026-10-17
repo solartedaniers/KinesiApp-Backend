@@ -105,6 +105,10 @@ python scripts/generate_grpc.py   # needs requirements-grpc-build.txt
 pytest tests/test_system_rpc.py   # pytest.ini already adds generated/ to the path
 ```
 
+The server needs `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_HOST`, `POSTGRES_DB` (optional `POSTGRES_PORT`, `POSTGRES_SSL_MODE`), `JWT_SECRET_KEY` (the same one as the REST API, so its tokens stay valid) and `OTP_EXPIRE_MINUTES`; it refuses to start without them. It talks to Neon through asyncpg, with prepared statement caching disabled so it works behind the Neon pooler.
+
+Every call goes through three interceptors: logging (method, status, duration), errors (domain errors become a standard gRPC status with `google.rpc.ErrorInfo`, reason in UPPER_SNAKE_CASE and domain `kinesiapp`) and auth (reads the `(kinesiapp.common.v1.access)` option of each RPC and checks the `authorization: Bearer <access token>` metadata).
+
 Run the server alone (it listens on `GRPC_HOST:GRPC_PORT`, `127.0.0.1:50051` by default):
 
 ```bash
@@ -115,5 +119,5 @@ Or run the deployable container: Envoy listens on `$PORT`, translates gRPC-Web (
 
 ```bash
 docker build -f deploy/grpc/Dockerfile -t kinesiapp-grpc .
-docker run --rm -e PORT=10000 -p 10000:10000 kinesiapp-grpc
+docker run --rm --env-file ../.env -e PORT=10000 -p 10000:10000 kinesiapp-grpc
 ```
