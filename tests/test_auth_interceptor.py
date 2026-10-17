@@ -8,6 +8,7 @@ from kinesiapp.analysis.v1 import analysis_pb2, analysis_pb2_grpc
 from kinesiapp.common.v1 import movement_pb2
 from kinesiapp.common.v1.errors_pb2 import ErrorReason
 from kinesiapp.system.v1 import system_pb2, system_pb2_grpc
+from kinesiapp.system.v1.system_pb2 import GetClientPolicyResponse
 
 from app.core.domain_error import DomainError
 from app.identity.principal import Principal, current_principal
@@ -15,6 +16,7 @@ from app.models.user import UserRole
 from app.rpc.access_policy import access_for
 from app.rpc.interceptors.auth import AuthInterceptor
 from app.rpc.interceptors.errors import ErrorInterceptor
+from app.ai.lifecycle import UnavailableAiLifecycle
 from app.rpc.system_servicer import SystemServicer
 from tests.grpc_harness import error_info, serving
 
@@ -35,7 +37,7 @@ class _PrincipalSystem(SystemServicer):
     """Responde WakeUpAi solo para comprobar quién llegó al handler."""
 
     def __init__(self, seen: list[Principal]) -> None:
-        super().__init__(lambda: datetime.now(timezone.utc))
+        super().__init__(lambda: datetime.now(timezone.utc), GetClientPolicyResponse(), UnavailableAiLifecycle())
         self._seen = seen
 
     async def WakeUpAi(self, request, context):

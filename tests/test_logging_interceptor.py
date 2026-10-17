@@ -5,16 +5,18 @@ from datetime import datetime, timezone
 import grpc
 import pytest
 from kinesiapp.system.v1 import system_pb2, system_pb2_grpc
+from kinesiapp.system.v1.system_pb2 import GetClientPolicyResponse
 
 from app.rpc.interceptors.errors import ErrorInterceptor
 from app.rpc.interceptors.logging import LoggingInterceptor
+from app.ai.lifecycle import UnavailableAiLifecycle
 from app.rpc.system_servicer import SystemServicer
 from tests.grpc_harness import serving
 
 
 async def _call_ping_and_wake_up() -> None:
     def register(server: grpc.aio.Server) -> None:
-        system_pb2_grpc.add_SystemServiceServicer_to_server(SystemServicer(lambda: datetime.now(timezone.utc)), server)
+        system_pb2_grpc.add_SystemServiceServicer_to_server(SystemServicer(lambda: datetime.now(timezone.utc), GetClientPolicyResponse(), UnavailableAiLifecycle()), server)
 
     async with serving(register, [LoggingInterceptor(), ErrorInterceptor()]) as channel:
         stub = system_pb2_grpc.SystemServiceStub(channel)
@@ -29,4 +31,4 @@ def test_logs_method_and_final_status_code(caplog: pytest.LogCaptureFixture) -> 
 
     lines = [record.getMessage() for record in caplog.records]
     assert lines[0].startswith("/kinesiapp.system.v1.SystemService/Ping OK ")
-    assert lines[1].startswith("/kinesiapp.system.v1.SystemService/WakeUpAi UNIMPLEMENTED ")
+    assert lines[1].startswith("/kinesiapp.system.v1.SystemService/WakeUpAi UNAVAILABLE ")
