@@ -3,12 +3,11 @@ from pathlib import Path
 from typing import BinaryIO
 from urllib.parse import quote, unquote
 
-import boto3
 from boto3.exceptions import Boto3Error
-from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from app.storage.object_storage import ObjectStorageError
+from app.storage.s3_client import build_s3_client
 
 
 class NeonObjectStorage:
@@ -17,15 +16,7 @@ class NeonObjectStorage:
     def __init__(
         self, endpoint_url: str, region: str, access_key_id: str, secret_access_key: str, bucket: str
     ) -> None:
-        self._client = boto3.client(
-            "s3",
-            endpoint_url=endpoint_url,
-            region_name=region,
-            aws_access_key_id=access_key_id,
-            aws_secret_access_key=secret_access_key,
-            # Neon sólo publica URLs path-style: su certificado no cubre <bucket>.<endpoint>
-            config=Config(s3={"addressing_style": "path"}),
-        )
+        self._client = build_s3_client(endpoint_url, region, access_key_id, secret_access_key)
         self._bucket = bucket
         self._public_base_url = f"{endpoint_url.rstrip('/')}/{bucket}/"
 
