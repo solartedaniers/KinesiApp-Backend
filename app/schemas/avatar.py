@@ -4,8 +4,9 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
-# El cliente ya la redimensiona y comprime antes de enviarla (workers/avatar.worker.ts)
-MAX_AVATAR_BYTES = 1_000_000
+from app.core.config import settings
+
+MAX_AVATAR_BYTES = settings.MAX_AVATAR_UPLOAD_BYTES
 
 AvatarContentType = Literal["image/jpeg", "image/png", "image/webp"]
 
