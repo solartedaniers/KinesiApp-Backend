@@ -1,11 +1,13 @@
 from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import SettingsConfigDict
+
+from app.settings.base import ENV_FILE, EnvSettings
 
 
-class GrpcServerSettings(BaseSettings):
+class GrpcServerSettings(EnvSettings):
     """Configuración del servidor gRPC, leída de las variables GRPC_*."""
 
-    model_config = SettingsConfigDict(env_prefix="GRPC_", extra="ignore")
+    model_config = SettingsConfigDict(env_prefix="GRPC_", env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore")
 
     # Escucho solo en localhost porque lo único expuesto a internet es Envoy, en el mismo contenedor
     HOST: str = Field(default="127.0.0.1", min_length=1)

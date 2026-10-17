@@ -9,8 +9,8 @@ from datetime import datetime, timezone
 import grpc
 from kinesiapp.system.v1 import system_pb2_grpc
 
-from app.rpc.settings import GrpcServerSettings
 from app.rpc.system_servicer import SystemServicer
+from app.settings.grpc import GrpcServerSettings
 
 logger = logging.getLogger(__name__)
 
