@@ -33,5 +33,9 @@ class MediaSettings(EnvSettings):
     # Token con el que el navegador sube un video directo a la API. Se valida al terminar de llegar el
     # cuerpo, así que debe durar más que la subida más lenta
     VIDEO_UPLOAD_TOKEN_EXPIRE_MINUTES: int = Field(default=30, gt=0)
+    # Vida de la URL firmada con la que el navegador sube directo al bucket: debe cubrir la subida más lenta
+    SIGNED_UPLOAD_URL_EXPIRE_SECONDS: int = Field(default=900, gt=0, le=7 * 24 * 3600)
+    # Vida de la URL firmada para ver un archivo privado; el cliente pide otra al vencer
+    SIGNED_READ_URL_EXPIRE_SECONDS: int = Field(default=300, gt=0, le=7 * 24 * 3600)
     # Clave del proceso interno que reporta resultados por REST. Sin definir, ese endpoint rechaza toda llamada
     JUMP_ANALYSIS_SERVICE_API_KEY: SecretStr | None = None
