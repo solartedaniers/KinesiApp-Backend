@@ -6,14 +6,12 @@ from typing import TypeVar
 
 from app.core.exceptions import ErrorCode, ServiceUnavailableException
 from app.schemas.avatar import AvatarUpload
+from app.storage.image_formats import ImageFormat
 from app.storage.object_storage import ObjectStorage, ObjectStorageError
 
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T")
-
-# Los tipos que admite AvatarUpload, con la extensión de la clave del objeto
-_EXTENSIONS = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 
 
 class AvatarStorage:
@@ -45,7 +43,7 @@ class AvatarStorage:
             logger.warning("Could not delete avatar %s: %s", url, error)
 
     def _save(self, upload: AvatarUpload) -> str:
-        key = f"avatars/{uuid.uuid4().hex}{_EXTENSIONS[upload.content_type]}"
+        key = f"avatars/{uuid.uuid4().hex}{ImageFormat.from_mime_type(upload.content_type).extension}"
         try:
             return self._object_storage.upload(BytesIO(upload.content()), key, upload.content_type)
         except ObjectStorageError as error:
