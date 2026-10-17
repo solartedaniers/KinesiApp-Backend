@@ -9,8 +9,6 @@ from pathlib import Path
 
 import grpc
 import pytest
-from google.rpc import error_details_pb2
-from grpc_status import rpc_status
 from kinesiapp.auth.v1 import auth_pb2, auth_pb2_grpc
 from kinesiapp.common.v1 import identity_pb2
 from kinesiapp.common.v1.errors_pb2 import ErrorReason
@@ -41,7 +39,7 @@ from app.rpc.auth_servicer import AuthServicer
 from app.rpc.interceptors.auth import AuthInterceptor
 from app.rpc.interceptors.errors import ErrorInterceptor
 from app.settings.auth import AuthSettings, PasswordPolicySettings
-from tests.grpc_harness import error_info, serving
+from tests.grpc_harness import error_info, field_violations, serving
 
 EMAIL = "ana@kinesiapp.com"
 PASSWORD = "Kinesi#2026"
@@ -151,12 +149,6 @@ def _bearer(session: auth_pb2.Session) -> tuple[tuple[str, str], ...]:
     return (("authorization", f"Bearer {session.access_token}"),)
 
 
-def _field_violations(error: grpc.aio.AioRpcError) -> list[str]:
-    bad_request = error_details_pb2.BadRequest()
-    assert any(detail.Unpack(bad_request) for detail in rpc_status.from_call(error).details)
-    return [violation.field for violation in bad_request.field_violations]
-
-
 def test_register_verify_and_login(tmp_path: Path) -> None:
     async def scenario(backend: _Backend) -> None:
         session = await backend.registered_and_verified()
@@ -192,7 +184,7 @@ def test_register_reports_every_invalid_field(tmp_path: Path) -> None:
     error = _run(tmp_path, scenario)
 
     assert error.code() == grpc.StatusCode.INVALID_ARGUMENT
-    assert sorted(_field_violations(error)) == ["email", "full_name", "password", "role"]
+    assert sorted(field_violations(error)) == ["email", "full_name", "password", "role"]
 
 
 def test_register_rejects_undeliverable_domains_and_verified_emails(tmp_path: Path) -> None:

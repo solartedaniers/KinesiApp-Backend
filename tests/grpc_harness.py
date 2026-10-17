@@ -29,3 +29,9 @@ def error_info(error: grpc.aio.AioRpcError) -> error_details_pb2.ErrorInfo:
     assert status is not None, "the error has no google.rpc.Status details"
     assert any(detail.Unpack(info) for detail in status.details)
     return info
+
+
+def field_violations(error: grpc.aio.AioRpcError) -> list[str]:
+    bad_request = error_details_pb2.BadRequest()
+    assert any(detail.Unpack(bad_request) for detail in rpc_status.from_call(error).details)
+    return [violation.field for violation in bad_request.field_violations]
