@@ -1,0 +1,33 @@
+from types import TracebackType
+from typing import Self
+
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from app.repositories.async_refresh_token_repository import AsyncRefreshTokenRepository
+from app.repositories.async_user_repository import AsyncUserRepository
+
+
+class UnitOfWork:
+    """Una sesión y una transacción por caso de uso: los repositorios comparten la sesión y commit confirma todo."""
+
+    users: AsyncUserRepository
+    refresh_tokens: AsyncRefreshTokenRepository
+
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+        self._session_factory = session_factory
+
+    async def __aenter__(self) -> Self:
+        self._session = self._session_factory()
+        self.users = AsyncUserRepository(self._session)
+        self.refresh_tokens = AsyncRefreshTokenRepository(self._session)
+        return self
+
+    async def __aexit__(
+        self, exc_type: type[BaseException] | None, exc: BaseException | None, traceback: TracebackType | None
+    ) -> None:
+        # Lo que no se confirmó con commit se descarta, también si el caso de uso falló a mitad
+        await self._session.rollback()
+        await self._session.close()
+
+    async def commit(self) -> None:
+        await self._session.commit()
