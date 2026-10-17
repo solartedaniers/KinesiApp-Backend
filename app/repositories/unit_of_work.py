@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.repositories.async_athlete_repository import AsyncAthleteRepository
 from app.repositories.async_refresh_token_repository import AsyncRefreshTokenRepository
+from app.repositories.async_team_repository import AsyncTeamRepository
 from app.repositories.async_user_repository import AsyncUserRepository
 
 
@@ -14,6 +15,7 @@ class UnitOfWork:
     users: AsyncUserRepository
     refresh_tokens: AsyncRefreshTokenRepository
     athletes: AsyncAthleteRepository
+    teams: AsyncTeamRepository
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         self._session_factory = session_factory
@@ -23,6 +25,7 @@ class UnitOfWork:
         self.users = AsyncUserRepository(self._session)
         self.refresh_tokens = AsyncRefreshTokenRepository(self._session)
         self.athletes = AsyncAthleteRepository(self._session)
+        self.teams = AsyncTeamRepository(self._session)
         return self
 
     async def __aexit__(
