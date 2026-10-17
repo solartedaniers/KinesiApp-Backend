@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
-# Contenedor del servidor gRPC: grpcio en localhost y Envoy expuesto en $PORT. Se construye desde la
-# raíz del repo: docker build -f deploy/grpc/Dockerfile .
+# Junto grpcio en localhost y Envoy expuesto en $PORT. Lo construyo desde la raíz del repo porque necesito
+# contracts/ y app/: docker build -f deploy/grpc/Dockerfile .
 
 FROM python:3.12-slim AS codegen
 WORKDIR /build

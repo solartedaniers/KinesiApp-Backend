@@ -1,5 +1,5 @@
-# Envoy recibe gRPC-Web por HTTP/1.1 (lo único que Render acepta desde internet) y lo traduce a gRPC
-# nativo hacia grpcio en el mismo contenedor. entrypoint.sh reemplaza los __PUERTOS__.
+# Pongo Envoy delante porque Render solo acepta HTTP/1.1 desde internet: recibo gRPC-Web y lo traduzco a
+# gRPC nativo hacia grpcio en el mismo contenedor. Los marcadores __ASÍ__ los reemplazo en entrypoint.sh.
 static_resources:
   listeners:
     - name: grpc_web
@@ -18,14 +18,14 @@ static_resources:
                     - name: backend
                       domains: ["*"]
                       routes:
-                        # El health check de Render; no toca grpcio
+                        # Respondo aquí el health check de Render, sin pasar por grpcio
                         - match: { path: /healthz }
                           direct_response: { status: 200, body: { inline_string: ok } }
                         # Solo dejo pasar los servicios del contrato; cualquier otra ruta es 404
                         - match: { prefix: /kinesiapp. }
                           route:
                             cluster: grpc_backend
-                            # Sin límite de Envoy: cada RPC lleva su propio deadline desde el cliente
+                            # Quito el límite de Envoy porque cada RPC ya trae su propio deadline desde el cliente
                             timeout: 0s
                 http_filters:
                   - name: envoy.filters.http.grpc_web
