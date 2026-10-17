@@ -2,21 +2,11 @@ from functools import lru_cache
 
 from fastapi import Depends
 
-from app.core.config import Settings, settings
+from app.core.config import settings
 from app.mail.auth_email_service import AuthEmailService
-from app.mail.email_sender import EmailSender, UnconfiguredEmailSender
-from app.mail.resend_email_sender import ResendEmailSender
+from app.mail.email_sender import EmailSender
+from app.mail.sender_factory import build_email_sender
 from app.services.email_domain_checker import EmailDomainChecker
-
-
-def build_email_sender(config: Settings) -> EmailSender:
-    if config.RESEND_API_KEY is None or not config.RESEND_API_KEY.get_secret_value():
-        return UnconfiguredEmailSender()
-    return ResendEmailSender(
-        api_key=config.RESEND_API_KEY.get_secret_value(),
-        from_email=config.RESEND_FROM_EMAIL,
-        timeout_seconds=config.RESEND_TIMEOUT_SECONDS,
-    )
 
 
 @lru_cache

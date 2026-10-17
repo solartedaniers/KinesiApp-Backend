@@ -11,7 +11,7 @@ from app.mail.email_sender import EmailDeliveryError, UnconfiguredEmailSender
 from app.mail.resend_email_sender import ResendEmailSender
 from app.services import email_domain_checker
 from app.services.email_domain_checker import EmailDomainChecker
-from app.services.email_factory import build_email_sender
+from app.mail.sender_factory import build_email_sender
 
 
 def _sender(monkeypatch, outcome):
