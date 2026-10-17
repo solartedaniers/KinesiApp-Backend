@@ -13,12 +13,12 @@ class DatabaseSettings(EnvSettings):
     POSTGRES_HOST: str = Field(min_length=1)
     POSTGRES_PORT: int = Field(default=5432, gt=0, le=65535)
     POSTGRES_DB: str = Field(min_length=1)
-    # asyncpg no lee PGSSLMODE como libpq: se lo paso explícito. Neon exige TLS
+    # Neon exige TLS. Lo paso explícito a los dos drivers: asyncpg no lee PGSSLMODE y libpq no lo lee del .env
     POSTGRES_SSL_MODE: str = Field(default="require", min_length=1)
 
     @property
     def database_url(self) -> URL:
-        return self._url("postgresql+psycopg2")
+        return self._url("postgresql+psycopg2").update_query_dict({"sslmode": self.POSTGRES_SSL_MODE})
 
     @property
     def async_database_url(self) -> URL:

@@ -17,8 +17,7 @@ curl -L -o models/yolo11n.onnx   https://github.com/ultralytics/assets/releases/
 
 # 1. Point KinesiApp-Backend/.env at Neon (no local Postgres anymore): POSTGRES_HOST/PORT/USER/PASSWORD/DB
 #    from Neon's DIRECT connection string (host without "-pooler"), see .env.example.
-#    libpq reads PGSSLMODE from the process environment, not from .env:
-export PGSSLMODE=require          # PowerShell: $env:PGSSLMODE="require"
+#    TLS comes from POSTGRES_SSL_MODE (default "require") for both psycopg2 and asyncpg.
 
 # 2. Migrate the schema (this runs against Neon: it is the real database)
 alembic upgrade head
