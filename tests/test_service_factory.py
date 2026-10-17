@@ -10,7 +10,7 @@ GENERATED = Path(__file__).resolve().parents[1] / "generated"
 # Los servicios de la IA los sirve su propio microservicio, no este backend
 FOREIGN_PACKAGES = {"kinesiapp.ai.v1"}
 # Dominios del contrato que aún no migro; la lista debe quedar vacía al terminar la migración del backend
-PENDING_PACKAGES = {"kinesiapp.athlete.v1", "kinesiapp.team.v1", "kinesiapp.analysis.v1", "kinesiapp.chat.v1"}
+PENDING_PACKAGES = {"kinesiapp.team.v1", "kinesiapp.analysis.v1", "kinesiapp.chat.v1"}
 
 
 class _RecordingServer:
@@ -47,6 +47,8 @@ def test_factory_registers_every_migrated_service() -> None:
         "kinesiapp.auth.v1.AuthService",
         "kinesiapp.account.v1.AccountService",
         "kinesiapp.admin.v1.UserAdminService",
+        "kinesiapp.athlete.v1.AthleteProfileService",
+        "kinesiapp.athlete.v1.ManagedAthleteService",
     ]
 
 

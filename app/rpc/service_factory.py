@@ -5,6 +5,7 @@ from functools import partial
 import grpc
 from kinesiapp.account.v1 import account_pb2_grpc
 from kinesiapp.admin.v1 import user_admin_pb2_grpc
+from kinesiapp.athlete.v1 import athlete_profile_service_pb2_grpc, managed_athlete_service_pb2_grpc
 from kinesiapp.auth.v1 import auth_pb2_grpc
 from kinesiapp.system.v1 import system_pb2_grpc
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -19,6 +20,12 @@ from app.admin.user_directory import UserDirectory
 from app.admin.user_provisioning import UserProvisioning
 from app.admin.user_role_assignment import UserRoleAssignment
 from app.ai.lifecycle import UnavailableAiLifecycle
+from app.athletes.athlete_administration import AthleteAdministration
+from app.athletes.athlete_directory import AthleteDirectory
+from app.athletes.inputs import AthleteInputRules
+from app.athletes.managed_athlete_avatars import ManagedAthleteAvatars
+from app.athletes.managed_athletes import ManagedAthletes
+from app.athletes.own_athlete_profile import OwnAthleteProfile
 from app.auth.auth_mailer import ThreadedAuthMailer
 from app.auth.email_verification import EmailVerification
 from app.auth.inputs import AuthInputRules
@@ -37,8 +44,11 @@ from app.mail.auth_email_service import AuthEmailService
 from app.mail.sender_factory import build_email_sender
 from app.repositories.unit_of_work import UnitOfWork
 from app.rpc.account_servicer import AccountServicer
+from app.rpc.athlete_messages import AthleteMessages
+from app.rpc.athlete_profile_servicer import AthleteProfileServicer
 from app.rpc.auth_servicer import AuthServicer
 from app.rpc.client_policy import build_client_policy
+from app.rpc.managed_athlete_servicer import ManagedAthleteServicer
 from app.rpc.system_servicer import SystemServicer
 from app.rpc.user_admin_servicer import UserAdminServicer
 from app.services.email_domain_checker import EmailDomainChecker
@@ -73,9 +83,12 @@ class RpcServiceFactory:
         )
         storage = StorageSettings()
         self._images = build_signed_storage(storage, self._media_settings, storage.S3_PRIVATE_IMAGES_BUCKET)
+        self._videos = build_signed_storage(storage, self._media_settings, storage.S3_PRIVATE_VIDEOS_BUCKET)
         self._avatar_links = AvatarLinks(self._images)
         tickets = UploadTicketService(auth_settings, self._media_settings.UPLOAD_TICKET_EXPIRE_SECONDS)
         self._avatar_files = AvatarFiles(self._images, tickets, self._media_settings.MAX_AVATAR_UPLOAD_BYTES)
+        self._athlete_settings = AthleteSettings()
+        self._page_rules = PageRules.from_settings(PaginationSettings())
 
     def registrations(self) -> list[ServicerRegistration]:
         return [
@@ -83,6 +96,8 @@ class RpcServiceFactory:
             partial(auth_pb2_grpc.add_AuthServiceServicer_to_server, self._auth()),
             partial(account_pb2_grpc.add_AccountServiceServicer_to_server, self._account()),
             partial(user_admin_pb2_grpc.add_UserAdminServiceServicer_to_server, self._user_admin()),
+            partial(athlete_profile_service_pb2_grpc.add_AthleteProfileServiceServicer_to_server, self._athlete_profiles()),
+            partial(managed_athlete_service_pb2_grpc.add_ManagedAthleteServiceServicer_to_server, self._managed_athletes()),
         ]
 
     @staticmethod
@@ -90,7 +105,7 @@ class RpcServiceFactory:
         return datetime.now(timezone.utc)
 
     def _system(self) -> SystemServicer:
-        client_policy = build_client_policy(self._media_settings, self._password_policy, AthleteSettings(), ChatSettings())
+        client_policy = build_client_policy(self._media_settings, self._password_policy, self._athlete_settings, ChatSettings())
         return SystemServicer(self._clock, client_policy, UnavailableAiLifecycle())
 
     def _auth(self) -> AuthServicer:
@@ -127,10 +142,29 @@ class RpcServiceFactory:
     def _user_admin(self) -> UserAdminServicer:
         return UserAdminServicer(
             AdminInputRules(self._password_policy),
-            PageRules.from_settings(PaginationSettings()),
+            self._page_rules,
             UserProvisioning(self._uow_factory, self._hasher, self._codes, self._mailer),
             UserDirectory(self._uow_factory),
             UserRoleAssignment(self._uow_factory),
             UserActivation(self._uow_factory),
             self._avatar_links,
+        )
+
+    def _athlete_profiles(self) -> AthleteProfileServicer:
+        return AthleteProfileServicer(
+            AthleteInputRules.from_settings(self._athlete_settings),
+            self._page_rules,
+            OwnAthleteProfile(self._uow_factory),
+            AthleteDirectory(self._uow_factory),
+            AthleteAdministration(self._uow_factory),
+            AthleteMessages(self._avatar_links),
+        )
+
+    def _managed_athletes(self) -> ManagedAthleteServicer:
+        return ManagedAthleteServicer(
+            AthleteInputRules.from_settings(self._athlete_settings),
+            AccountInputRules(self._media_settings.MAX_AVATAR_UPLOAD_BYTES),
+            ManagedAthletes(self._uow_factory, self._avatar_files, self._videos),
+            ManagedAthleteAvatars(self._uow_factory, self._avatar_files),
+            AthleteMessages(self._avatar_links),
         )
