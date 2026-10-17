@@ -1,6 +1,11 @@
 # Servidor gRPC (app/rpc). Separado de requirements.txt mientras conviven FastAPI y gRPC: este
-# contenedor no necesita la pila de IA ni la base de datos
+# contenedor no necesita la pila de IA ni FastAPI
 grpcio==1.84.0
+# Para devolver google.rpc.Status con ErrorInfo/BadRequest en los errores (trae googleapis-common-protos)
+grpcio-status==1.84.0
 # Igual o más nueva que la que usa grpcio-tools para generar el código
 protobuf==7.36.2
 pydantic-settings==2.7.1
+# Mismos modelos ORM que el REST, pero con sesiones asíncronas sobre asyncpg
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.32.0

@@ -3,3 +3,5 @@ pytest==8.3.4
 httpx==0.28.1
 # tests/pose_fixtures.py lo importa directo; misma versión que fija kinesiapp-ai
 numpy==2.5.3
+# Motor asíncrono en memoria para probar los repositorios y servicios gRPC sin Neon
+aiosqlite==0.22.1
