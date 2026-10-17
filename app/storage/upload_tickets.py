@@ -13,6 +13,8 @@ from app.settings.auth import AuthSettings
 
 class UploadPurpose(str, enum.Enum):
     AVATAR = "avatar"
+    # Lo emito a nombre del deportista gestionado: así el ticket no sirve para la foto de otro deportista del coach
+    MANAGED_ATHLETE_AVATAR = "managed_athlete_avatar"
 
 
 @dataclass(frozen=True)
