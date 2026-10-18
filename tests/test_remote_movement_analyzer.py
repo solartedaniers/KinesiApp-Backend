@@ -77,9 +77,10 @@ def test_progress_arrives_as_updates_and_the_stream_ends_with_the_result(kind: s
         ((grpc.StatusCode.UNAVAILABLE, None), "AI_UNAVAILABLE", True),
         ((grpc.StatusCode.INVALID_ARGUMENT, "VIDEO_UNREADABLE"), "VIDEO_UNREADABLE", False),
         ((grpc.StatusCode.FAILED_PRECONDITION, "NO_MOVEMENT_DETECTED"), "NO_MOVEMENT_DETECTED", False),
-        ((grpc.StatusCode.INTERNAL, None), "AI_UNAVAILABLE", False),
+        # Así llega un RST_STREAM del ingress: INTERNAL sin ErrorInfo, pasajero
+        ((grpc.StatusCode.INTERNAL, None), "AI_UNAVAILABLE", True),
     ],
-    ids=["busy", "storage", "bare-unavailable", "unreadable", "no-movement", "internal"],
+    ids=["busy", "storage", "bare-unavailable", "unreadable", "no-movement", "transport-reset"],
 )
 def test_failures_keep_their_reason_and_only_passing_ones_are_retryable(fail, reason: str, retryable: bool) -> None:
     with pytest.raises(AnalyzerError) as caught:

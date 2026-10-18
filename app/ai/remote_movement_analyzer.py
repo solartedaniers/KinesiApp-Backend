@@ -38,8 +38,9 @@ class MovementAnalyzer(Protocol):
 class RemoteMovementAnalyzer:
     """Adapter de MovementAnalyzer sobre el MovementAnalysisService de la IA.
 
-    Decido aquí qué fallos se reintentan porque solo aquí conozco los status de gRPC: AI_BUSY y cualquier
-    UNAVAILABLE (IA dormida, arrancando o sin poder descargar) son pasajeros; el resto no cambia al repetir.
+    Decido aquí qué fallos se reintentan porque solo aquí conozco los status de gRPC: AI_BUSY, cualquier
+    UNAVAILABLE (IA dormida, arrancando o sin poder descargar) y un INTERNAL sin reason, que es como llega un
+    RST_STREAM del ingress, son pasajeros; el resto no cambia al repetir.
     """
 
     def __init__(self, transport: AiTransport, timeout: float) -> None:
@@ -68,7 +69,8 @@ def _progress(progress: movement_pb2.AnalysisProgress) -> AnalysisProgressUpdate
 
 
 def _analyzer_error(error: AiCallError) -> AnalyzerError:
-    retryable = error.code is grpc.StatusCode.UNAVAILABLE or error.reason == _BUSY
+    transport_reset = error.code is grpc.StatusCode.INTERNAL and not error.reason
+    retryable = error.code is grpc.StatusCode.UNAVAILABLE or error.reason == _BUSY or transport_reset
     if error.reason in _CONTRACT_REASONS and error.code is not grpc.StatusCode.UNAUTHENTICATED:
         return AnalyzerError(error.reason, retryable, error.message)
     # Un token que no coincide o un fallo sin reason es problema de la IA, no del video
