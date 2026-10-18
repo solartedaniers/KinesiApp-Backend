@@ -2,7 +2,7 @@
 
 Uso, desde KinesiApp-Backend:
   python -I scripts/cloud_check.py --admin-email <correo> [--athlete-email <correo> --coach-email <correo>]
-      [--only account,admin,refresh,athlete,team]
+      [--only account,admin,refresh,athlete,team,ai]
 Las contraseñas las leo de KINESI_ADMIN_PASSWORD, KINESI_ATHLETE_PASSWORD y KINESI_COACH_PASSWORD, o las pido por consola.
 Todo lo que creo (deportistas gestionados, equipos, fotos) lo borro al final; lo que edito lo dejo como estaba.
 """
@@ -27,7 +27,7 @@ BACKEND = Path(__file__).resolve().parents[1]
 DEFAULT_URL = "https://kinesiapp-backend-prueva.onrender.com"
 DEFAULT_ORIGIN = "https://kinesiapp-git-feature-grpc-spike-solartedaniers-projects.vercel.app"
 PRIVATE_IMAGES_BUCKET = "kinesiapp-dev-images"
-ALL_SECTIONS = ("account", "admin", "refresh", "athlete", "team")
+ALL_SECTIONS = ("account", "admin", "refresh", "athlete", "team", "ai")
 
 
 class Session:
@@ -370,6 +370,15 @@ def team_section(rpc: RpcClient, report: Report, admin: Session, athlete: Sessio
         report.check("Deleted team is NOT_FOUND", error and error["code"] == "not_found", error)
 
 
+def ai_section(rpc: RpcClient, report: Report, session: Session) -> None:
+    # Llamo dos veces: la primera puede incluir el arranque en frío de la IA y la segunda mide la ida y vuelta en caliente
+    for label in ("first", "second"):
+        started = time.monotonic()
+        response, error = rpc.call("kinesiapp.system.v1.SystemService/WakeUpAi", {}, session.access_token)
+        elapsed = f"{time.monotonic() - started:.1f}s"
+        report.check(f"WakeUpAi {label} call is READY", error is None and response.get("state") == "AI_STATE_READY", error or elapsed)
+
+
 def _password(variable: str, label: str) -> str:
     return os.environ.pop(variable, "") or getpass.getpass(f"{label} password: ")
 
@@ -406,6 +415,8 @@ def main() -> int:
         finally:
             if managed_id:
                 delete_managed_athlete(rpc, report, coach, managed_id, avatar_url)
+    if "ai" in sections:
+        ai_section(rpc, report, admin)
     if "refresh" in sections:
         refresh_section(rpc, report, admin)
     return report.summary()
