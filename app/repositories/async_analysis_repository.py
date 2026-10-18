@@ -1,10 +1,12 @@
+from datetime import datetime
+
 from sqlalchemy import Select, delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.athlete import AthleteProfile
 from app.models.chat import ChatConversation
-from app.models.jump_analysis import JumpAnalysis
+from app.models.jump_analysis import JointAngleMeasurement, JumpAnalysis, JumpAnalysisStatus
 from app.repositories.async_base_repository import AsyncBaseRepository
 
 
@@ -25,12 +27,26 @@ class AsyncAnalysisRepository(AsyncBaseRepository[JumpAnalysis]):
         query = _with_athlete().options(selectinload(JumpAnalysis.angle_measurements))
         return await self._session.scalar(query.where(JumpAnalysis.id == analysis_id))
 
+    async def find_by_video(self, video_reference: str) -> JumpAnalysis | None:
+        return await self._session.scalar(_with_athlete().where(JumpAnalysis.video_reference == video_reference))
+
+    async def list_stalled(self, updated_before: datetime) -> list[JumpAnalysis]:
+        query = select(JumpAnalysis).where(
+            JumpAnalysis.status == JumpAnalysisStatus.PENDING, JumpAnalysis.progress_updated_at < updated_before
+        )
+        return list(await self._session.scalars(query.order_by(JumpAnalysis.id)))
+
     async def list_by_athlete(self, athlete_id: int, before_id: int, limit: int) -> list[JumpAnalysis]:
         return await self._newest_first(_with_athlete().where(JumpAnalysis.athlete_id == athlete_id), before_id, limit)
 
     async def list_by_coach(self, coach_id: int, before_id: int, limit: int) -> list[JumpAnalysis]:
         query = _with_athlete().join(JumpAnalysis.athlete).where(AthleteProfile.coach_id == coach_id)
         return await self._newest_first(query, before_id, limit)
+
+    def add_measurements(self, measurements: list[JointAngleMeasurement]) -> None:
+        # Las agrego sueltas y no por la relación: asignarla obligaría a cargar la colección vieja, y en async
+        # no hay carga perezosa
+        self._session.add_all(measurements)
 
     async def delete(self, analysis: JumpAnalysis) -> None:
         # Borro las conversaciones a mano: el ORM no las conoce desde el análisis y SQLite no aplica el
