@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,14 +12,23 @@ class AsyncChatConversationRepository(AsyncBaseRepository[ChatConversation]):
     def __init__(self, session: AsyncSession) -> None:
         super().__init__(session, ChatConversation)
 
-    async def find(self, analysis_id: int, user_id: int, *, lock: bool = False) -> ChatConversation | None:
+    async def find(self, analysis_id: int, user_id: int) -> ChatConversation | None:
         query = select(ChatConversation).where(
             ChatConversation.jump_analysis_id == analysis_id, ChatConversation.user_id == user_id
         )
-        # Con lock serializo a dos pestañas del mismo usuario sobre el mismo hilo hasta el commit
-        if lock:
-            query = query.with_for_update()
         return await self._session.scalar(query)
+
+    async def lock(self, analysis_id: int, user_id: int) -> None:
+        """Serializo hasta el commit a quien escriba en este hilo. Debe ser lo primero de la transacción.
+
+        Uso un UPDATE sin efecto y no SELECT FOR UPDATE porque así también bloquea en SQLite: en Postgres
+        toma la fila y en SQLite el candado de escritura, y quien llega segundo lee después del commit.
+        """
+        await self._session.execute(
+            update(ChatConversation)
+            .where(ChatConversation.jump_analysis_id == analysis_id, ChatConversation.user_id == user_id)
+            .values(user_id=ChatConversation.user_id)
+        )
 
     async def get_or_create(self, analysis_id: int, user_id: int) -> ChatConversation:
         existing = await self.find(analysis_id, user_id)
