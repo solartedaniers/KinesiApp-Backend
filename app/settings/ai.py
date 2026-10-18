@@ -24,3 +24,5 @@ class AiClientSettings(EnvSettings):
     WAKE_UP_RETRY_INTERVAL_SECONDS: float = Field(default=2.0, gt=0)
     # Cada llamada a WarmUp por separado: corta, porque la espera larga la cubre el reintento
     WAKE_UP_CALL_TIMEOUT_SECONDS: float = Field(default=15.0, gt=0)
+    # Plazo de una respuesta del asistente en streaming: cubre el arranque en frío más lo que tarda Gemini
+    ASSISTANT_TIMEOUT_SECONDS: float = Field(default=90.0, gt=0)
