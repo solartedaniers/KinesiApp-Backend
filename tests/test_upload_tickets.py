@@ -14,6 +14,13 @@ def test_ticket_carries_what_was_authorized() -> None:
     assert tickets.verify(tickets.issue(TICKET), 7, UploadPurpose.AVATAR) == TICKET
 
 
+def test_a_video_ticket_also_carries_its_athlete_and_movement() -> None:
+    tickets = UploadTicketService(SETTINGS, lifetime_seconds=60)
+    video = UploadTicket(7, UploadPurpose.ANALYSIS_VIDEO, "videos/a.mp4", "video/mp4", 10, {"athlete_id": "3", "movement": "SQUAT"})
+
+    assert tickets.verify(tickets.issue(video), 7, UploadPurpose.ANALYSIS_VIDEO) == video
+
+
 @pytest.mark.parametrize(
     "upload_id, owner_id, lifetime",
     [

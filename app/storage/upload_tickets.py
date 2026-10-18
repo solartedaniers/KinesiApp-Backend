@@ -1,5 +1,5 @@
 import enum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 
@@ -15,6 +15,7 @@ class UploadPurpose(str, enum.Enum):
     AVATAR = "avatar"
     # Lo emito a nombre del deportista gestionado: así el ticket no sirve para la foto de otro deportista del coach
     MANAGED_ATHLETE_AVATAR = "managed_athlete_avatar"
+    ANALYSIS_VIDEO = "analysis_video"
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,8 @@ class UploadTicket:
     key: str
     content_type: str
     content_length: int
+    # Lo que el ticket fija además del archivo, por ejemplo el deportista y el movimiento de un video
+    metadata: dict[str, str] = field(default_factory=dict)
 
 
 class _TicketClaims(BaseModel):
@@ -33,6 +36,7 @@ class _TicketClaims(BaseModel):
     key: str
     content_type: str
     content_length: int
+    metadata: dict[str, str] = {}
 
 
 class UploadTicketService:
@@ -51,6 +55,7 @@ class UploadTicketService:
             "key": ticket.key,
             "content_type": ticket.content_type,
             "content_length": ticket.content_length,
+            "metadata": ticket.metadata,
             "exp": datetime.now(timezone.utc) + self._lifetime,
         }
         return jwt.encode(claims, self._secret, algorithm=self._algorithm)
@@ -63,7 +68,7 @@ class UploadTicketService:
         # Trato un ticket de otra persona o de otro tipo de archivo igual que uno inexistente
         if claims.sub != owner_id or claims.purpose is not purpose:
             raise _upload_not_found()
-        return UploadTicket(owner_id, purpose, claims.key, claims.content_type, claims.content_length)
+        return UploadTicket(owner_id, purpose, claims.key, claims.content_type, claims.content_length, claims.metadata)
 
 
 def _upload_not_found() -> DomainError:
