@@ -27,7 +27,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
-DEFAULT_URL = "https://kinesiapp-backend-prueva.onrender.com"
+DEFAULT_URL = "https://kinesiapp-backend-grpc.onrender.com"
 DEFAULT_ORIGIN = "https://kinesiapp-git-feature-grpc-spike-solartedaniers-projects.vercel.app"
 PRIVATE_IMAGES_BUCKET = "kinesiapp-dev-images"
 PRIVATE_VIDEOS_BUCKET = "kinesiapp-dev-videos"
