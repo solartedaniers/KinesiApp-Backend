@@ -4,10 +4,11 @@ import grpc
 from kinesiapp.chat.v1 import chat_pb2, chat_pb2_grpc
 from kinesiapp.common.v1 import chat_pb2 as common_chat_pb2
 
+from app.analysis.inputs import AnalysisIdInput
 from app.chat.chat_events import SavedMessage, TextDelta
 from app.chat.conversation_history import ConversationHistory
 from app.chat.conversation_opening import ConversationOpening
-from app.chat.inputs import AnalysisIdInput, ChatInputRules, QuestionInput
+from app.chat.inputs import ChatInputRules, QuestionInput
 from app.chat.question_answering import QuestionAnswering
 from app.identity.principal import current_principal
 from app.models.chat import ChatMessage, ChatRole

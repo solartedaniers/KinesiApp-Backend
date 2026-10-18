@@ -1,8 +1,9 @@
 from dataclasses import dataclass
 from typing import Any
 
-from pydantic import BaseModel, Field, ValidationInfo, field_validator
+from pydantic import ValidationInfo, field_validator
 
+from app.analysis.inputs import AnalysisIdInput
 from app.core.input_rules import InputModel, parse_input, rules_of
 
 
@@ -12,10 +13,6 @@ class ChatInputRules:
 
     def parse(self, model: type[InputModel], data: dict[str, Any]) -> InputModel:
         return parse_input(model, data, self)
-
-
-class AnalysisIdInput(BaseModel):
-    analysis_id: int = Field(gt=0)
 
 
 class QuestionInput(AnalysisIdInput):
