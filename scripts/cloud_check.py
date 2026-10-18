@@ -5,6 +5,7 @@ Uso, desde KinesiApp-Backend:
       [--only account,admin,refresh,athlete,team,ai]
   python -I scripts/cloud_check.py --only analysis --athlete-email <correo> --video <mp4> --video-duration-ms <ms>
       [--keep-on-failure]   deja el análisis y su video si algo falla, para revisarlos en la base de grpc-dev
+      [--upload-min-kbps N] velocidad de subida más lenta que espero en el PUT del video (1000 por defecto)
 Las contraseñas las leo de KINESI_ADMIN_PASSWORD, KINESI_ATHLETE_PASSWORD y KINESI_COACH_PASSWORD, o las pido por consola.
 Todo lo que creo (deportistas gestionados, equipos, fotos, análisis y su video) lo borro al final; lo que edito lo dejo como estaba.
 """
@@ -133,10 +134,15 @@ def tiny_png() -> bytes:
     return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(b"\x00\xff\x00\x00")) + chunk(b"IEND", b"")
 
 
-def http(method: str, url: str, data: bytes | None = None, headers: dict | None = None) -> tuple[int, dict, bytes]:
+HTTP_TIMEOUT_SECONDS = 30
+
+
+def http(
+    method: str, url: str, data: bytes | None = None, headers: dict | None = None, timeout: float = HTTP_TIMEOUT_SECONDS
+) -> tuple[int, dict, bytes]:
     request = urllib.request.Request(url, data=data, method=method, headers=headers or {})
     try:
-        with urllib.request.urlopen(request, timeout=30) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             return response.status, {k.lower(): v for k, v in response.headers.items()}, response.read()
     except urllib.error.HTTPError as error:
         return error.code, {k.lower(): v for k, v in error.headers.items()}, error.read()
@@ -415,8 +421,20 @@ def ai_section(rpc: RpcClient, report: Report, session: Session) -> None:
         report.check(f"WakeUpAi {label} call is READY", error is None and response.get("state") == "AI_STATE_READY", error or elapsed)
 
 
+def upload_timeout(size_bytes: int, min_kbps: int) -> float:
+    # Le doy al PUT el tiempo de subir el archivo a la velocidad mínima indicada, además del margen de siempre
+    return HTTP_TIMEOUT_SECONDS + size_bytes * 8 / (min_kbps * 1000)
+
+
 def analysis_section(
-    rpc: RpcClient, report: Report, athlete: Session, video: Path, duration_ms: int, origin: str, keep_on_failure: bool
+    rpc: RpcClient,
+    report: Report,
+    athlete: Session,
+    video: Path,
+    duration_ms: int,
+    origin: str,
+    keep_on_failure: bool,
+    upload_min_kbps: int,
 ) -> None:
     service = "kinesiapp.analysis.v1.AnalysisService"
     failures_before = report.failures()
@@ -447,7 +465,10 @@ def analysis_section(
         "OPTIONS", target["url"], headers={"Origin": origin, "Access-Control-Request-Method": "PUT", "Access-Control-Request-Headers": "content-type"}
     )
     report.check("Video CORS preflight from the preview", headers.get("access-control-allow-origin") == origin, f"status={status}")
-    status, _, _ = timed("PUT to the bucket", lambda: http("PUT", target["url"], content, target.get("headers", {})))
+    put_timeout = upload_timeout(len(content), upload_min_kbps)
+    status, _, _ = timed(
+        "PUT to the bucket", lambda: http("PUT", target["url"], content, target.get("headers", {}), put_timeout)
+    )
     if not report.check("Real PUT of the video", status == 200, f"status={status} size={len(content)}"):
         return
     confirmed, error = timed("ConfirmVideoUpload", lambda: rpc.call(f"{service}/ConfirmVideoUpload", {"uploadId": upload["uploadId"]}, token))
@@ -529,6 +550,7 @@ def main() -> int:
     parser.add_argument("--video", type=Path)
     parser.add_argument("--video-duration-ms", type=int)
     parser.add_argument("--keep-on-failure", action="store_true")
+    parser.add_argument("--upload-min-kbps", type=int, default=1000, help="slowest upload speed to wait for, in kbit/s")
     args = parser.parse_args()
     sections = set(args.only.split(","))
     if sections & ADMIN_SECTIONS and not args.admin_email:
@@ -562,7 +584,7 @@ def main() -> int:
     if "ai" in sections:
         ai_section(rpc, report, admin)
     if "analysis" in sections:
-        analysis_section(rpc, report, athlete, args.video, args.video_duration_ms, args.origin, args.keep_on_failure)
+        analysis_section(rpc, report, athlete, args.video, args.video_duration_ms, args.origin, args.keep_on_failure, args.upload_min_kbps)
     if "refresh" in sections:
         refresh_section(rpc, report, admin)
     return report.summary()
