@@ -447,10 +447,12 @@ def analysis_section(
         timings.append((label, time.monotonic() - started))
         return result
 
-    account, error = rpc.call("kinesiapp.account.v1.AccountService/GetMyAccount", {}, token)
+    account, error = timed("GetMyAccount", lambda: rpc.call("kinesiapp.account.v1.AccountService/GetMyAccount", {}, token))
     if not report.check("Athlete has accepted the video consent", error is None and "videoConsentVersion" in account["account"], error):
         return
-    profile, error = rpc.call("kinesiapp.athlete.v1.AthleteProfileService/GetMyAthleteProfile", {}, token)
+    profile, error = timed(
+        "GetMyAthleteProfile", lambda: rpc.call("kinesiapp.athlete.v1.AthleteProfileService/GetMyAthleteProfile", {}, token)
+    )
     if not report.check("Athlete has an athlete profile", error is None, error):
         return
     content = video.read_bytes()
