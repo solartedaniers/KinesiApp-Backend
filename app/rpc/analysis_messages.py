@@ -52,7 +52,7 @@ class AnalysisMessages:
             try:
                 assessment = self._codec.to_assessment(analysis.risk_details, self._levels.level(analysis.risk_score))
             except ValidationError:
-                # Un JSON viejo que no cuadra no debe tumbar la consulta: muestro el resto sin el desglose
+                # No dejo que un JSON viejo que no cuadra tumbe la consulta: muestro el resto sin el desglose
                 logger.warning("Analysis %s has unreadable risk details", analysis.id)
             else:
                 message.risk_assessment.CopyFrom(assessment)

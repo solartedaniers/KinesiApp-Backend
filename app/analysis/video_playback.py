@@ -25,7 +25,7 @@ class VideoPlayback:
         try:
             key = self._videos.key_from_url(analysis.video_reference)
         except ValueError as error:
-            # Los videos del REST viven en el bucket público de producción y este servidor no los firma
+            # No firmo los videos del REST: viven en el bucket público de producción
             logger.warning("Video of analysis %s is outside the private bucket", analysis_id)
             raise DomainError(ErrorReason.ERROR_REASON_NOT_FOUND, "The video is not available") from error
         return self._videos.presign_read(key)

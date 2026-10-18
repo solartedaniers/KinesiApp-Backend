@@ -77,7 +77,7 @@ def test_progress_arrives_as_updates_and_the_stream_ends_with_the_result(kind: s
         ((grpc.StatusCode.UNAVAILABLE, None), "AI_UNAVAILABLE", True),
         ((grpc.StatusCode.INVALID_ARGUMENT, "VIDEO_UNREADABLE"), "VIDEO_UNREADABLE", False),
         ((grpc.StatusCode.FAILED_PRECONDITION, "NO_MOVEMENT_DETECTED"), "NO_MOVEMENT_DETECTED", False),
-        # Así llega un RST_STREAM del ingress: INTERNAL sin ErrorInfo, pasajero
+        # Así me llega un RST_STREAM del ingress: INTERNAL sin ErrorInfo, y lo trato como pasajero
         ((grpc.StatusCode.INTERNAL, None), "AI_UNAVAILABLE", True),
     ],
     ids=["busy", "storage", "bare-unavailable", "unreadable", "no-movement", "transport-reset"],

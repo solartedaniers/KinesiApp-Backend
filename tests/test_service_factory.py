@@ -72,7 +72,7 @@ def test_every_backend_service_in_the_contracts_is_registered_or_pending() -> No
 
 
 def test_the_analysis_wakes_the_ai_up_before_each_attempt() -> None:
-    # Sin esto, el stream que despierta la réplica de Azure se corta a mitad del análisis
+    # Lo compruebo porque sin esto el stream que despierta la réplica de Azure se corta a mitad del análisis
     processing = RpcServiceFactory(async_sessionmaker(), AUTH_SETTINGS)._analysis_processing()
 
     assert isinstance(processing._analyzer, WarmingMovementAnalyzer)

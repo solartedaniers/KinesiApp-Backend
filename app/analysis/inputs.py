@@ -34,7 +34,7 @@ class VideoUploadInput(BaseModel):
 
 @dataclass(frozen=True)
 class VideoUploadRules:
-    """Los límites del video que también valida el cliente. Respondo con los reason del contrato, no con un
+    """Aplico los límites del video que también valida el cliente. Respondo con los reason del contrato, no con un
     campo inválido, para que el frontend muestre el mensaje exacto."""
 
     max_bytes: int

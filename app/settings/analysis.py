@@ -13,8 +13,8 @@ class AnalysisSettings(EnvSettings):
 
     model_config = SettingsConfigDict(env_prefix="ANALYSIS_", env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore")
 
-    # Plazo de cada llamada a AnalyzeVideo, ya con la IA despierta por WarmUp: cubre el análisis de un video de
-    # 40 s con holgura y queda bajo los 240 s con que el ingress de Azure corta una solicitud
+    # Le doy a cada llamada a AnalyzeVideo, ya con la IA despierta por WarmUp, un plazo que cubre con holgura un
+    # video de 40 s y queda bajo los 240 s con que el ingress de Azure corta una solicitud
     STREAM_TIMEOUT_SECONDS: float = Field(default=180.0, gt=0)
     # Intentos en total por análisis, contando el primero
     MAX_ATTEMPTS: int = Field(default=4, ge=1)

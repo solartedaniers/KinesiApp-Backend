@@ -68,7 +68,7 @@ class VideoUploads:
         athlete_id = int(ticket.metadata[_ATHLETE])
         video_reference = self._videos.url_for(ticket.key)
         async with self._uow_factory() as uow:
-            # Confirmar dos veces la misma subida devuelve el mismo análisis, no uno nuevo
+            # Si confirman dos veces la misma subida, devuelvo el mismo análisis y no creo otro
             existing = await uow.analyses.find_by_video(video_reference)
             if existing is not None:
                 return existing

@@ -1,4 +1,4 @@
-"""WarmingMovementAnalyzer: la IA despierta antes de abrir el stream, y si no despierta se reintenta."""
+"""Pruebo que WarmingMovementAnalyzer despierte la IA antes de abrir el stream y que, si no despierta, el fallo se reintente."""
 
 import asyncio
 

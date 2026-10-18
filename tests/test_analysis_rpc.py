@@ -62,7 +62,7 @@ def _result() -> movement_analysis_pb2.MovementAnalysisResult:
 
 
 class _FakeAnalyzer:
-    """IA en memoria: cada llamada sigue el guion que le toca; "ok" espera a que la prueba suelte la compuerta."""
+    """Simulo la IA en memoria: cada llamada sigue el guion que le toca; "ok" espera a que la prueba suelte la compuerta."""
 
     def __init__(self, script: list[str]) -> None:
         self.script = script
@@ -246,7 +246,7 @@ def test_the_athlete_uploads_follows_reads_plays_and_deletes_an_analysis(tmp_pat
     assert [sample.frame_timestamp_ms for sample in detail.angle_samples] == [0, 33]
     assert detail.angle_samples[0].joint == movement_pb2.JOINT_ANGLE_TRUNK_INCLINATION
     assert detail.risk_assessment.dominant_pattern == "forward_collapse" and detail.pose_model_version == "pose-v1"
-    # La IA recibe una URL firmada de lectura, nunca la canónica del bucket privado
+    # Compruebo que a la IA le llegue una URL firmada de lectura, nunca la canónica del bucket privado
     assert lab.analyzer.calls[0].endswith("?signature=get")
     assert video.url.startswith(BUCKET_URL + "videos/") and video.url.endswith("?signature=get")
     assert [item.id for item in listed.analyses] == [summary.id] and listed.page.next_page_token == ""
@@ -265,7 +265,7 @@ def test_uploads_require_permission_current_consent_and_the_video_limits(tmp_pat
         return {
             "old_consent": await _failure(stub.CreateVideoUpload(_upload_request(people.profile_id), metadata=bearer(people.athlete))),
             "stranger": await _failure(stub.CreateVideoUpload(_upload_request(people.profile_id), metadata=bearer(people.stranger))),
-            # El coach solo sube por sus deportistas gestionados; el otro tiene cuenta y sube él mismo
+            # Al coach solo lo dejo subir por sus deportistas gestionados; el que tiene cuenta sube él mismo
             "coach_own": await _failure(stub.CreateVideoUpload(_upload_request(people.profile_id), metadata=bearer(people.coach))),
             "too_large": await _failure(
                 stub.CreateVideoUpload(_upload_request(people.managed_id, content_length=MAX_BYTES + 1), metadata=bearer(people.coach))
@@ -319,7 +319,7 @@ def test_confirming_checks_the_object_and_deletes_what_is_not_the_declared_video
 
     assert error_info(missing).reason == "UPLOAD_NOT_FOUND"
     assert error_info(invalid).reason == "INVALID_VIDEO" and objects == {}
-    # El ticket es de quien pidió la subida: otra cuenta no puede confirmarlo
+    # Ato el ticket a quien pidió la subida: otra cuenta no puede confirmarlo
     assert error_info(foreign).reason == "UPLOAD_NOT_FOUND"
     assert count == 0
 
@@ -361,7 +361,7 @@ def test_a_late_watcher_gets_the_persisted_progress_and_then_the_live_one(tmp_pa
     assert error is None
     assert events[0].progress.stage == movement_pb2.ANALYSIS_STAGE_EXTRACTING_POSE and events[0].progress.frames_total == 100
     assert events[-1].finished.status == movement_pb2.ANALYSIS_STATUS_PROCESSED
-    # Si ya terminó, el stream entrega solo el resultado y cierra
+    # Si ya terminó, entrego solo el resultado y cierro el stream
     assert len(after) == 1 and after[0].HasField("finished")
     assert error_info(stranger).reason == "FORBIDDEN"
 
@@ -415,7 +415,7 @@ def test_deleting_while_processing_stops_it_and_ends_the_watchers_with_not_found
 
     forbidden, events, error, stored, objects = _run(tmp_path, scenario)
 
-    # El coach ve los análisis de su deportista con cuenta, pero no los borra
+    # Al coach le dejo ver los análisis de su deportista con cuenta, pero no borrarlos
     assert error_info(forbidden).reason == "FORBIDDEN"
     assert events and error is not None and error.code() is grpc.StatusCode.NOT_FOUND
     assert stored is None and objects == {}

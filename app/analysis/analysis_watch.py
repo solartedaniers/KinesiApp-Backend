@@ -7,7 +7,7 @@ from app.identity.principal import Principal
 from app.models.jump_analysis import JumpAnalysis, JumpAnalysisStatus
 from app.repositories.unit_of_work import UnitOfWork
 
-# Cada evento es un avance o, al final, el análisis ya terminado
+# Emito avances y cierro con el análisis ya terminado
 WatchEvent = AnalysisProgressUpdate | JumpAnalysis
 
 

@@ -7,7 +7,7 @@ from pydantic import BaseModel
 # Es la forma del JSON de jump_analyses.risk_details que ya guardaba el REST; la IA usa la misma
 RISK_DETAILS_FORMAT_VERSION = 1
 
-# Nombre de cada articulación en el JSON de riesgo y en joint_angle_measurements.joint_name
+# Uso el mismo nombre de articulación en el JSON de riesgo y en joint_angle_measurements.joint_name
 JOINT_NAMES = {
     movement_pb2.JOINT_ANGLE_KNEE_FLEXION: "knee_flexion",
     movement_pb2.JOINT_ANGLE_TRUNK_INCLINATION: "trunk_inclination",
