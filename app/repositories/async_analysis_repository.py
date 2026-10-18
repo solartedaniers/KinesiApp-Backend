@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Select, and_, delete, or_, select, update
+from sqlalchemy import Select, and_, delete, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -59,6 +59,10 @@ class AsyncAnalysisRepository(AsyncBaseRepository[JumpAnalysis]):
         )
         query = select(JumpAnalysis).where(JumpAnalysis.status == JumpAnalysisStatus.PENDING, abandoned)
         return list(await self._session.scalars(query.order_by(JumpAnalysis.id)))
+
+    async def count_pending(self) -> int:
+        query = select(func.count()).select_from(JumpAnalysis).where(JumpAnalysis.status == JumpAnalysisStatus.PENDING)
+        return await self._session.scalar(query)
 
     async def list_by_athlete(self, athlete_id: int, before_id: int, limit: int) -> list[JumpAnalysis]:
         return await self._newest_first(_with_athlete().where(JumpAnalysis.athlete_id == athlete_id), before_id, limit)

@@ -150,6 +150,30 @@ def test_the_new_instance_does_not_retake_an_analysis_whose_ai_call_is_still_run
     assert stored.status is JumpAnalysisStatus.PROCESSED and stored.pose_model_version == "pose-old" and samples == 2
 
 
+def test_the_periodic_recovery_waits_for_a_live_lease_and_then_stops_querying(tmp_path: Path) -> None:
+    async def scenario(analysis_id, old, new, clock, session_factory):
+        running = asyncio.create_task(old.processing.process(analysis_id))
+        await old.analyzer.started.wait()
+        sleeps: list[float] = []
+
+        async def sleep(seconds: float) -> None:
+            # La instancia vieja muere a mitad de la llamada: su lease vence después de mi primera búsqueda
+            sleeps.append(seconds)
+            running.cancel()
+            clock.advance(LEASE + 1)
+
+        await new.recovery.watch(60.0, sleep)
+        new.analyzer.gate.set()
+        await asyncio.gather(*[asyncio.create_task(new.processing.process(i)) for i in new.submissions.ids])
+        return sleeps, new.submissions.ids, await _stored(session_factory, analysis_id)
+
+    sleeps, submitted, (stored, _) = _deploy(tmp_path, scenario)
+
+    # Una sola espera: al retomarlo ya no queda nada en otras manos y dejo de consultar la base
+    assert sleeps == [60.0] and submitted == [1]
+    assert stored.status is JumpAnalysisStatus.PROCESSED and stored.pose_model_version == "pose-new"
+
+
 def test_an_attempt_that_lost_its_lease_cannot_save_over_the_new_owner(tmp_path: Path) -> None:
     async def scenario(analysis_id, old, new, clock, session_factory):
         running = asyncio.create_task(old.processing.process(analysis_id))
