@@ -46,7 +46,7 @@ async def serve(settings: GrpcServerSettings, auth_settings: AuthSettings, datab
     server = build_server(settings, build_interceptors(verifier), factory.registrations())
     await server.start()
     logger.info("gRPC server listening on %s:%s", settings.HOST, settings.PORT)
-    await factory.resume_stalled_analyses()
+    recovering = asyncio.create_task(factory.watch_stalled_analyses(), name="stalled-analysis-recovery")
 
     stopping = asyncio.Event()
     # Escucho SIGTERM porque así detiene Render el contenedor; en Windows no existe y basta Ctrl+C
@@ -55,6 +55,9 @@ async def serve(settings: GrpcServerSettings, auth_settings: AuthSettings, datab
     try:
         await stopping.wait()
     finally:
+        recovering.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await recovering
         await server.stop(settings.SHUTDOWN_GRACE_SECONDS)
         await factory.aclose()
         await engine.dispose()

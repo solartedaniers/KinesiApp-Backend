@@ -83,7 +83,7 @@ from app.rpc.team_servicer import TeamServicer
 from app.rpc.user_admin_servicer import UserAdminServicer
 from app.services.email_domain_checker import EmailDomainChecker
 from app.settings.ai import AiClientSettings
-from app.settings.analysis import AnalysisSettings
+from app.settings.analysis import AnalysisSettings, ensure_lease_outlasts_ai_call
 from app.settings.athlete import AthleteSettings
 from app.settings.auth import AuthSettings, PasswordPolicySettings
 from app.settings.chat import ChatSettings
@@ -132,6 +132,7 @@ class RpcServiceFactory:
         self._risk_codec = RiskAssessmentCodec()
         # Comparto el hub y el runner entre la subida, el seguimiento, el borrado y la recuperación del arranque
         self._analysis_settings = AnalysisSettings()
+        ensure_lease_outlasts_ai_call(self._analysis_settings, self._ai_settings)
         self._progress_hub = AnalysisProgressHub()
         self._analysis_runner = AnalysisRunner(self._analysis_processing().process, self._analysis_settings.MAX_CONCURRENCY)
 
@@ -148,11 +149,12 @@ class RpcServiceFactory:
             partial(analysis_pb2_grpc.add_AnalysisServiceServicer_to_server, self._analysis()),
         ]
 
-    async def resume_stalled_analyses(self) -> int:
+    async def watch_stalled_analyses(self) -> None:
+        settings = self._analysis_settings
         recovery = StalledAnalysisRecovery(
-            self._uow_factory, self._analysis_runner, self._analysis_settings.STALE_AFTER_SECONDS, self._clock
+            self._uow_factory, self._analysis_runner, settings.PROCESSING_LEASE_SECONDS, self._clock
         )
-        return await recovery.recover()
+        await recovery.watch(settings.RECOVERY_INTERVAL_SECONDS)
 
     async def aclose(self) -> None:
         # Detengo los análisis antes de cerrar el canal que usan hacia la IA
@@ -259,6 +261,7 @@ class RpcServiceFactory:
             self._risk_codec,
             RetryPolicy.from_settings(settings),
             settings.PROGRESS_PERSIST_INTERVAL_SECONDS,
+            settings.PROCESSING_LEASE_SECONDS,
             self._clock,
         )
 

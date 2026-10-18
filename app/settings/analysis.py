@@ -1,6 +1,7 @@
 from pydantic import Field, model_validator
 from pydantic_settings import SettingsConfigDict
 
+from app.settings.ai import AiClientSettings
 from app.settings.base import ENV_FILE, EnvSettings
 
 
@@ -26,11 +27,24 @@ class AnalysisSettings(EnvSettings):
     MAX_CONCURRENCY: int = Field(default=1, ge=1)
     # Cada cuánto escribo el progreso en la base; en vivo lo publico siempre
     PROGRESS_PERSIST_INTERVAL_SECONDS: float = Field(default=2.0, ge=0)
-    # Al arrancar retomo los PENDING sin progreso desde hace este tiempo: quedaron colgados por un reinicio
-    STALE_AFTER_SECONDS: float = Field(default=120.0, gt=0)
+    # Mientras el lease de un intento no vence, ninguna otra instancia lo reclama. El intento lo renueva cada vez
+    # que guarda progreso, así que tiene que cubrir lo más largo sin avance: despertar la IA más AnalyzeVideo
+    PROCESSING_LEASE_SECONDS: float = Field(default=300.0, gt=0)
+    # Cada cuánto busco análisis con el lease vencido, además de al arrancar
+    RECOVERY_INTERVAL_SECONDS: float = Field(default=60.0, gt=0)
 
     @model_validator(mode="after")
     def _ceiling_covers_first_delay(self) -> "AnalysisSettings":
         if self.RETRY_MAX_DELAY_SECONDS < self.RETRY_INITIAL_DELAY_SECONDS:
             raise ValueError("ANALYSIS_RETRY_MAX_DELAY_SECONDS must not be below ANALYSIS_RETRY_INITIAL_DELAY_SECONDS")
         return self
+
+
+def ensure_lease_outlasts_ai_call(analysis: AnalysisSettings, ai: AiClientSettings) -> None:
+    # Lo valido al arrancar porque un lease más corto que la llamada deja que otra instancia duplique el análisis
+    longest_call = ai.WAKE_UP_TIMEOUT_SECONDS + analysis.STREAM_TIMEOUT_SECONDS
+    if analysis.PROCESSING_LEASE_SECONDS <= longest_call:
+        raise ValueError(
+            "ANALYSIS_PROCESSING_LEASE_SECONDS must exceed AI_WAKE_UP_TIMEOUT_SECONDS + ANALYSIS_STREAM_TIMEOUT_SECONDS"
+            f" ({longest_call:g} s)"
+        )

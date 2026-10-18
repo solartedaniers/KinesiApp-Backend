@@ -1,6 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
+from app.settings.ai import AiClientSettings
+from app.settings.analysis import AnalysisSettings, ensure_lease_outlasts_ai_call
 from app.settings.auth import AuthSettings
 
 
@@ -30,3 +32,12 @@ def test_an_empty_secret_counts_as_missing(monkeypatch: pytest.MonkeyPatch) -> N
 
     with pytest.raises(ValidationError, match=r"JWT_SECRET_KEY\s+Field required"):
         AuthSettings(_env_file=None)
+
+
+def test_the_processing_lease_must_outlast_waking_the_ai_plus_the_analysis_call() -> None:
+    ai = AiClientSettings(_env_file=None, SERVICE_URL="ai.test:443", SERVICE_TOKEN="t" * 32, WAKE_UP_TIMEOUT_SECONDS=60)
+    analysis = AnalysisSettings(_env_file=None, STREAM_TIMEOUT_SECONDS=180, PROCESSING_LEASE_SECONDS=240)
+
+    with pytest.raises(ValueError, match="ANALYSIS_PROCESSING_LEASE_SECONDS"):
+        ensure_lease_outlasts_ai_call(analysis, ai)
+    ensure_lease_outlasts_ai_call(AnalysisSettings(_env_file=None), ai)

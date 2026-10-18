@@ -46,6 +46,7 @@ CONSENT_VERSION = 2
 MAX_BYTES = 1_000
 MAX_DURATION_MS = 40_000
 MAX_ATTEMPTS = 3
+LEASE = 300.0
 NOW = datetime(2026, 10, 18, 12, 0, tzinfo=timezone.utc)
 
 
@@ -111,10 +112,10 @@ def _run(tmp_path: Path, scenario, script: list[str] | None = None):
             delays.append(seconds)
 
         processing = AnalysisProcessing(
-            uows, bucket, analyzer, hub, codec, RetryPolicy(MAX_ATTEMPTS, 5.0, 2.0, 60.0), 0.0, lambda: NOW, sleep
+            uows, bucket, analyzer, hub, codec, RetryPolicy(MAX_ATTEMPTS, 5.0, 2.0, 60.0), 0.0, LEASE, lambda: NOW, sleep
         )
         runner = AnalysisRunner(processing.process, 1)
-        parts.update(runner=runner, delays=delays, recovery=StalledAnalysisRecovery(uows, runner, 120.0, lambda: NOW))
+        parts.update(runner=runner, delays=delays, recovery=StalledAnalysisRecovery(uows, runner, LEASE, lambda: NOW))
         servicer = AnalysisServicer(
             PageRules(default_size=10, max_size=50),
             VideoUploads(
