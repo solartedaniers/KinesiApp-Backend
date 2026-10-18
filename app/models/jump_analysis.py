@@ -39,7 +39,7 @@ class JumpAnalysis(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     athlete_id: Mapped[int] = mapped_column(ForeignKey("athlete_profiles.id"), nullable=False)
-    video_reference: Mapped[str] = mapped_column(String(500), nullable=False)
+    video_reference: Mapped[str] = mapped_column(String(500), unique=True, nullable=False)
     movement_type: Mapped[MovementType] = mapped_column(
         Enum(MovementType), default=MovementType.JUMP, server_default=MovementType.JUMP.name, nullable=False
     )
