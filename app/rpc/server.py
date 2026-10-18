@@ -46,6 +46,7 @@ async def serve(settings: GrpcServerSettings, auth_settings: AuthSettings, datab
     server = build_server(settings, build_interceptors(verifier), factory.registrations())
     await server.start()
     logger.info("gRPC server listening on %s:%s", settings.HOST, settings.PORT)
+    await factory.resume_stalled_analyses()
 
     stopping = asyncio.Event()
     # Escucho SIGTERM porque así detiene Render el contenedor; en Windows no existe y basta Ctrl+C

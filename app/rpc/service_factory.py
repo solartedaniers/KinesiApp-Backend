@@ -4,6 +4,7 @@ from functools import partial
 
 import grpc
 from kinesiapp.account.v1 import account_pb2_grpc
+from kinesiapp.analysis.v1 import analysis_pb2_grpc
 from kinesiapp.admin.v1 import user_admin_pb2_grpc
 from kinesiapp.athlete.v1 import athlete_profile_service_pb2_grpc, managed_athlete_service_pb2_grpc
 from kinesiapp.auth.v1 import auth_pb2_grpc
@@ -23,9 +24,21 @@ from app.admin.user_provisioning import UserProvisioning
 from app.admin.user_role_assignment import UserRoleAssignment
 from app.ai.remote_assistant import RemoteAnalysisAssistant
 from app.ai.remote_lifecycle import RemoteAiLifecycle
+from app.ai.remote_movement_analyzer import RemoteMovementAnalyzer
 from app.ai.transport_factory import build_ai_transport
+from app.analysis.analysis_catalog import AnalysisCatalog
+from app.analysis.analysis_processing import AnalysisProcessing
+from app.analysis.analysis_recovery import StalledAnalysisRecovery
+from app.analysis.analysis_removal import AnalysisRemoval
+from app.analysis.analysis_runner import AnalysisRunner
+from app.analysis.analysis_watch import AnalysisWatch
+from app.analysis.inputs import VideoUploadRules
+from app.analysis.progress_hub import AnalysisProgressHub
+from app.analysis.retry_policy import RetryPolicy
 from app.analysis.risk_assessment_codec import RiskAssessmentCodec
 from app.analysis.risk_level import RiskLevelClassifier
+from app.analysis.video_playback import VideoPlayback
+from app.analysis.video_uploads import VideoUploads
 from app.athletes.athlete_administration import AthleteAdministration
 from app.athletes.athlete_directory import AthleteDirectory
 from app.athletes.inputs import AthleteInputRules
@@ -56,6 +69,8 @@ from app.mail.auth_email_service import AuthEmailService
 from app.mail.sender_factory import build_email_sender
 from app.repositories.unit_of_work import UnitOfWork
 from app.rpc.account_servicer import AccountServicer
+from app.rpc.analysis_messages import AnalysisMessages
+from app.rpc.analysis_servicer import AnalysisServicer
 from app.rpc.athlete_messages import AthleteMessages
 from app.rpc.athlete_profile_servicer import AthleteProfileServicer
 from app.rpc.auth_servicer import AuthServicer
@@ -67,6 +82,7 @@ from app.rpc.team_servicer import TeamServicer
 from app.rpc.user_admin_servicer import UserAdminServicer
 from app.services.email_domain_checker import EmailDomainChecker
 from app.settings.ai import AiClientSettings
+from app.settings.analysis import AnalysisSettings
 from app.settings.athlete import AthleteSettings
 from app.settings.auth import AuthSettings, PasswordPolicySettings
 from app.settings.chat import ChatSettings
@@ -103,8 +119,8 @@ class RpcServiceFactory:
         self._images = build_signed_storage(storage, self._media_settings, storage.S3_PRIVATE_IMAGES_BUCKET)
         self._videos = build_signed_storage(storage, self._media_settings, storage.S3_PRIVATE_VIDEOS_BUCKET)
         self._avatar_links = AvatarLinks(self._images)
-        tickets = UploadTicketService(auth_settings, self._media_settings.UPLOAD_TICKET_EXPIRE_SECONDS)
-        self._avatar_files = AvatarFiles(self._images, tickets, self._media_settings.MAX_AVATAR_UPLOAD_BYTES)
+        self._tickets = UploadTicketService(auth_settings, self._media_settings.UPLOAD_TICKET_EXPIRE_SECONDS)
+        self._avatar_files = AvatarFiles(self._images, self._tickets, self._media_settings.MAX_AVATAR_UPLOAD_BYTES)
         self._athlete_settings = AthleteSettings()
         self._page_rules = PageRules.from_settings(PaginationSettings())
         self._ai_settings = AiClientSettings()
@@ -113,6 +129,10 @@ class RpcServiceFactory:
         risk = RiskSettings()
         self._risk_levels = RiskLevelClassifier(risk.RISK_LEVEL_MODERATE, risk.RISK_LEVEL_HIGH)
         self._risk_codec = RiskAssessmentCodec()
+        # Comparto el hub y el runner entre la subida, el seguimiento, el borrado y la recuperación del arranque
+        self._analysis_settings = AnalysisSettings()
+        self._progress_hub = AnalysisProgressHub()
+        self._analysis_runner = AnalysisRunner(self._analysis_processing().process, self._analysis_settings.MAX_CONCURRENCY)
 
     def registrations(self) -> list[ServicerRegistration]:
         return [
@@ -124,9 +144,18 @@ class RpcServiceFactory:
             partial(managed_athlete_service_pb2_grpc.add_ManagedAthleteServiceServicer_to_server, self._managed_athletes()),
             partial(team_pb2_grpc.add_TeamServiceServicer_to_server, self._teams()),
             partial(chat_pb2_grpc.add_ChatServiceServicer_to_server, self._chat()),
+            partial(analysis_pb2_grpc.add_AnalysisServiceServicer_to_server, self._analysis()),
         ]
 
+    async def resume_stalled_analyses(self) -> int:
+        recovery = StalledAnalysisRecovery(
+            self._uow_factory, self._analysis_runner, self._analysis_settings.STALE_AFTER_SECONDS, self._clock
+        )
+        return await recovery.recover()
+
     async def aclose(self) -> None:
+        # Detengo los análisis antes de cerrar el canal que usan hacia la IA
+        await self._analysis_runner.aclose()
         await self._ai.aclose()
 
     @staticmethod
@@ -215,4 +244,31 @@ class RpcServiceFactory:
             ConversationHistory(self._uow_factory),
             ConversationOpening(self._uow_factory, facts, assistant, limits),
             QuestionAnswering(self._uow_factory, facts, assistant, limits),
+        )
+
+    def _analysis_processing(self) -> AnalysisProcessing:
+        settings = self._analysis_settings
+        return AnalysisProcessing(
+            self._uow_factory,
+            self._videos,
+            RemoteMovementAnalyzer(self._ai, settings.STREAM_TIMEOUT_SECONDS),
+            self._progress_hub,
+            self._risk_codec,
+            RetryPolicy.from_settings(settings),
+            settings.PROGRESS_PERSIST_INTERVAL_SECONDS,
+            self._clock,
+        )
+
+    def _analysis(self) -> AnalysisServicer:
+        media = self._media_settings
+        rules = VideoUploadRules(media.MAX_VIDEO_UPLOAD_BYTES, media.MAX_VIDEO_DURATION_SECONDS * 1000)
+        runner, hub = self._analysis_runner, self._progress_hub
+        return AnalysisServicer(
+            self._page_rules,
+            VideoUploads(self._uow_factory, self._videos, self._tickets, rules, media.VIDEO_CONSENT_VERSION, runner),
+            AnalysisWatch(self._uow_factory, hub),
+            AnalysisCatalog(self._uow_factory),
+            AnalysisRemoval(self._uow_factory, self._videos, runner, hub),
+            VideoPlayback(self._uow_factory, self._videos),
+            AnalysisMessages(self._risk_codec, self._risk_levels),
         )
