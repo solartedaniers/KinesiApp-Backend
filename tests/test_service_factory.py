@@ -3,6 +3,7 @@ from pathlib import Path
 
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from app.ai.warming_movement_analyzer import WarmingMovementAnalyzer
 from app.rpc.service_factory import RpcServiceFactory
 from tests.rpc_world import AUTH_SETTINGS
 
@@ -68,3 +69,10 @@ def test_every_backend_service_in_the_contracts_is_registered_or_pending() -> No
     # Si ya registré un dominio pendiente, lo saco de la lista para que no se quede ahí sin necesidad
     assert {package(s) for s in registered} & PENDING_PACKAGES == set()
     assert PENDING_PACKAGES <= {package(s) for s in expected}
+
+
+def test_the_analysis_wakes_the_ai_up_before_each_attempt() -> None:
+    # Sin esto, el stream que despierta la réplica de Azure se corta a mitad del análisis
+    processing = RpcServiceFactory(async_sessionmaker(), AUTH_SETTINGS)._analysis_processing()
+
+    assert isinstance(processing._analyzer, WarmingMovementAnalyzer)

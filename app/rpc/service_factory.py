@@ -26,6 +26,7 @@ from app.ai.remote_assistant import RemoteAnalysisAssistant
 from app.ai.remote_lifecycle import RemoteAiLifecycle
 from app.ai.remote_movement_analyzer import RemoteMovementAnalyzer
 from app.ai.transport_factory import build_ai_transport
+from app.ai.warming_movement_analyzer import WarmingMovementAnalyzer
 from app.analysis.analysis_catalog import AnalysisCatalog
 from app.analysis.analysis_processing import AnalysisProcessing
 from app.analysis.analysis_recovery import StalledAnalysisRecovery
@@ -162,13 +163,15 @@ class RpcServiceFactory:
     def _clock() -> datetime:
         return datetime.now(timezone.utc)
 
-    def _system(self) -> SystemServicer:
-        client_policy = build_client_policy(self._media_settings, self._password_policy, self._athlete_settings, self._chat_settings)
+    def _ai_lifecycle(self) -> RemoteAiLifecycle:
         ai = self._ai_settings
-        lifecycle = RemoteAiLifecycle(
+        return RemoteAiLifecycle(
             self._ai, ai.WAKE_UP_TIMEOUT_SECONDS, ai.WAKE_UP_CALL_TIMEOUT_SECONDS, ai.WAKE_UP_RETRY_INTERVAL_SECONDS
         )
-        return SystemServicer(self._clock, client_policy, lifecycle)
+
+    def _system(self) -> SystemServicer:
+        client_policy = build_client_policy(self._media_settings, self._password_policy, self._athlete_settings, self._chat_settings)
+        return SystemServicer(self._clock, client_policy, self._ai_lifecycle())
 
     def _auth(self) -> AuthServicer:
         hasher, codes, mailer = self._hasher, self._codes, self._mailer
@@ -251,7 +254,7 @@ class RpcServiceFactory:
         return AnalysisProcessing(
             self._uow_factory,
             self._videos,
-            RemoteMovementAnalyzer(self._ai, settings.STREAM_TIMEOUT_SECONDS),
+            WarmingMovementAnalyzer(self._ai_lifecycle(), RemoteMovementAnalyzer(self._ai, settings.STREAM_TIMEOUT_SECONDS)),
             self._progress_hub,
             self._risk_codec,
             RetryPolicy.from_settings(settings),
