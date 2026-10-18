@@ -4,6 +4,7 @@ Uso, desde KinesiApp-Backend:
   python -I scripts/cloud_check.py --admin-email <correo> [--athlete-email <correo> --coach-email <correo>]
       [--only account,admin,refresh,athlete,team,ai]
   python -I scripts/cloud_check.py --only analysis --athlete-email <correo> --video <mp4> --video-duration-ms <ms>
+      [--keep-on-failure]   deja el análisis y su video si algo falla, para revisarlos en la base de grpc-dev
 Las contraseñas las leo de KINESI_ADMIN_PASSWORD, KINESI_ATHLETE_PASSWORD y KINESI_COACH_PASSWORD, o las pido por consola.
 Todo lo que creo (deportistas gestionados, equipos, fotos, análisis y su video) lo borro al final; lo que edito lo dejo como estaba.
 """
@@ -114,6 +115,9 @@ class Report:
         self.results.append((name, passed))
         print(("PASS " if passed else "FAIL ") + name + (f"  [{detail}]" if detail else ""), flush=True)
         return passed
+
+    def failures(self) -> int:
+        return sum(1 for _, passed in self.results if not passed)
 
     def summary(self) -> int:
         failed = [name for name, passed in self.results if not passed]
@@ -411,8 +415,11 @@ def ai_section(rpc: RpcClient, report: Report, session: Session) -> None:
         report.check(f"WakeUpAi {label} call is READY", error is None and response.get("state") == "AI_STATE_READY", error or elapsed)
 
 
-def analysis_section(rpc: RpcClient, report: Report, athlete: Session, video: Path, duration_ms: int, origin: str) -> None:
+def analysis_section(
+    rpc: RpcClient, report: Report, athlete: Session, video: Path, duration_ms: int, origin: str, keep_on_failure: bool
+) -> None:
     service = "kinesiapp.analysis.v1.AnalysisService"
+    failures_before = report.failures()
     token = athlete.access_token
     timings: list[tuple[str, float]] = []
 
@@ -460,7 +467,10 @@ def analysis_section(rpc: RpcClient, report: Report, athlete: Session, video: Pa
         report.check(
             "WatchAnalysis streams progress and ends PROCESSED",
             error is None and finished and finished["status"] == "ANALYSIS_STATUS_PROCESSED",
-            error or f"{len(events)} events, stages={sorted(set(filter(None, stages)))}, risk={finished and finished.get('riskLevel')}",
+            error
+            or f"{len(events)} events, stages={list(dict.fromkeys(filter(None, stages)))}, "
+            f"status={finished and finished.get('status')}, failure={finished and finished.get('failureReason')}, "
+            f"risk={finished and finished.get('riskLevel')}",
         )
         detail, error = rpc.call(f"{service}/GetAnalysis", {"analysisId": analysis_id}, token)
         samples = len(detail["analysis"].get("angleSamples", [])) if detail else 0
@@ -490,6 +500,9 @@ def analysis_section(rpc: RpcClient, report: Report, athlete: Session, video: Pa
             error or f"{len(answer)} events",
         )
     finally:
+        if keep_on_failure and report.failures() > failures_before:
+            print(f"\nKept analysis {analysis_id} and its video for inspection; delete it with DeleteAnalysis when done")
+            return
         _, error = timed("DeleteAnalysis", lambda: rpc.call(f"{service}/DeleteAnalysis", {"analysisId": analysis_id}, token))
         report.check("DeleteAnalysis", error is None, error)
         _, error = rpc.call(f"{service}/GetAnalysis", {"analysisId": analysis_id}, token)
@@ -515,6 +528,7 @@ def main() -> int:
     parser.add_argument("--only", default=",".join(ALL_SECTIONS))
     parser.add_argument("--video", type=Path)
     parser.add_argument("--video-duration-ms", type=int)
+    parser.add_argument("--keep-on-failure", action="store_true")
     args = parser.parse_args()
     sections = set(args.only.split(","))
     if sections & ADMIN_SECTIONS and not args.admin_email:
@@ -548,7 +562,7 @@ def main() -> int:
     if "ai" in sections:
         ai_section(rpc, report, admin)
     if "analysis" in sections:
-        analysis_section(rpc, report, athlete, args.video, args.video_duration_ms, args.origin)
+        analysis_section(rpc, report, athlete, args.video, args.video_duration_ms, args.origin, args.keep_on_failure)
     if "refresh" in sections:
         refresh_section(rpc, report, admin)
     return report.summary()
