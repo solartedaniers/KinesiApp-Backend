@@ -21,3 +21,5 @@ resend==2.49.1
 # Firmar URLs del bucket y revisar lo que el navegador subió (Neon Storage es compatible con S3)
 boto3==1.43.108
 botocore==1.43.108
+# Cliente gRPC-Web hacia la IA (app/ai/grpc_web_transport.py): hoy su Envoy solo acepta HTTP/1.1
+httpx==0.28.1
