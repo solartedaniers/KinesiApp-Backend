@@ -17,6 +17,9 @@ class AiClientSettings(EnvSettings):
     SERVICE_TOKEN: SecretStr = Field(min_length=32)
     # Hoy la IA está en Render detrás de Envoy, que solo acepta HTTP/1.1 desde internet
     TRANSPORT: Literal["grpc-web", "grpc"] = "grpc-web"
+    # Con grpc, si cifro el canal. Lo dejo activo por defecto porque el ingress de Container Apps termina TLS en
+    # el 443; solo lo apago dentro de una red privada
+    GRPC_TLS: bool = True
     CONNECT_TIMEOUT_SECONDS: float = Field(default=10.0, gt=0)
     # Lo que espero a que la IA despierte. En Render free medí unos 35 s desde dormida hasta READY
     WAKE_UP_TIMEOUT_SECONDS: float = Field(default=60.0, gt=0)
