@@ -15,13 +15,13 @@ class AiClientSettings(EnvSettings):
     SERVICE_URL: str = Field(min_length=1)
     # Sin valor por defecto, como todo secreto: si falta, el backend no arranca
     SERVICE_TOKEN: SecretStr = Field(min_length=32)
-    # Hoy la IA está en Render detrás de Envoy, que solo acepta HTTP/1.1 desde internet
+    # gRPC-Web pasa por cualquier proxy HTTP/1.1; con la IA en Azure uso grpc, que su ingress acepta por HTTP/2
     TRANSPORT: Literal["grpc-web", "grpc"] = "grpc-web"
     # Con grpc, si cifro el canal. Lo dejo activo por defecto porque el ingress de Container Apps termina TLS en
     # el 443; solo lo apago dentro de una red privada
     GRPC_TLS: bool = True
     CONNECT_TIMEOUT_SECONDS: float = Field(default=10.0, gt=0)
-    # Lo que espero a que la IA despierte. En Render free medí unos 35 s desde dormida hasta READY
+    # Lo que espero a que la IA despierte. Desde Render hasta Azure Container Apps medí 33 s desde dormida hasta READY
     WAKE_UP_TIMEOUT_SECONDS: float = Field(default=60.0, gt=0)
     # Mientras su Envoy responde UNAVAILABLE porque grpcio todavía arranca, reintento cada tanto
     WAKE_UP_RETRY_INTERVAL_SECONDS: float = Field(default=2.0, gt=0)
