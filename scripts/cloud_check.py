@@ -3,8 +3,9 @@
 Uso, desde KinesiApp-Backend:
   python -I scripts/cloud_check.py --admin-email <correo> [--athlete-email <correo> --coach-email <correo>]
       [--only account,admin,refresh,athlete,team,ai]
+  python -I scripts/cloud_check.py --only analysis --athlete-email <correo> --video <mp4> --video-duration-ms <ms>
 Las contraseñas las leo de KINESI_ADMIN_PASSWORD, KINESI_ATHLETE_PASSWORD y KINESI_COACH_PASSWORD, o las pido por consola.
-Todo lo que creo (deportistas gestionados, equipos, fotos) lo borro al final; lo que edito lo dejo como estaba.
+Todo lo que creo (deportistas gestionados, equipos, fotos, análisis y su video) lo borro al final; lo que edito lo dejo como estaba.
 """
 
 import argparse
@@ -27,7 +28,9 @@ BACKEND = Path(__file__).resolve().parents[1]
 DEFAULT_URL = "https://kinesiapp-backend-prueva.onrender.com"
 DEFAULT_ORIGIN = "https://kinesiapp-git-feature-grpc-spike-solartedaniers-projects.vercel.app"
 PRIVATE_IMAGES_BUCKET = "kinesiapp-dev-images"
-ALL_SECTIONS = ("account", "admin", "refresh", "athlete", "team", "ai")
+PRIVATE_VIDEOS_BUCKET = "kinesiapp-dev-videos"
+ALL_SECTIONS = ("account", "admin", "refresh", "athlete", "team", "ai", "analysis")
+ADMIN_SECTIONS = {"account", "admin", "refresh", "athlete", "team", "ai"}
 
 
 class Session:
@@ -65,6 +68,35 @@ class RpcClient:
             None,
         )
         return None, {"code": error.get("code"), "reason": reason}
+
+    def stream(self, method: str, body: dict, token: str) -> tuple[list[tuple[float, dict]], dict | None]:
+        """Devuelvo cada mensaje del stream con los segundos desde que lo abrí, para medir la primera respuesta."""
+        command = [self._buf, "curl", "--protocol", "grpcweb", "--schema", str(self._schema), "-d", json.dumps(body),
+                   "-H", f"authorization: Bearer {token}", f"{self._url}/{method}"]
+        started = time.monotonic()
+        process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8")
+        decoder, pending, messages = json.JSONDecoder(), "", []
+        for line in process.stdout:
+            pending += line
+            # buf curl escribe cada mensaje como un objeto JSON indentado; lo tomo en cuanto se cierra
+            try:
+                message, end = decoder.raw_decode(pending.strip())
+            except json.JSONDecodeError:
+                continue
+            messages.append((time.monotonic() - started, message))
+            pending = pending.strip()[end:]
+        stderr = process.stderr.read()
+        if process.wait() == 0:
+            return messages, None
+        try:
+            error = json.loads(stderr)
+        except json.JSONDecodeError:
+            return messages, {"code": "unparsed", "reason": None, "message": stderr.strip()[:200]}
+        reason = next(
+            (_error_info_reason(d["value"]) for d in error.get("details", []) if d.get("type") == "google.rpc.ErrorInfo"),
+            None,
+        )
+        return messages, {"code": error.get("code"), "reason": reason}
 
 
 def _error_info_reason(value: str) -> str:
@@ -379,6 +411,96 @@ def ai_section(rpc: RpcClient, report: Report, session: Session) -> None:
         report.check(f"WakeUpAi {label} call is READY", error is None and response.get("state") == "AI_STATE_READY", error or elapsed)
 
 
+def analysis_section(rpc: RpcClient, report: Report, athlete: Session, video: Path, duration_ms: int, origin: str) -> None:
+    service = "kinesiapp.analysis.v1.AnalysisService"
+    token = athlete.access_token
+    timings: list[tuple[str, float]] = []
+
+    def timed(label: str, action):
+        started = time.monotonic()
+        result = action()
+        timings.append((label, time.monotonic() - started))
+        return result
+
+    account, error = rpc.call("kinesiapp.account.v1.AccountService/GetMyAccount", {}, token)
+    if not report.check("Athlete has accepted the video consent", error is None and "videoConsentVersion" in account["account"], error):
+        return
+    profile, error = rpc.call("kinesiapp.athlete.v1.AthleteProfileService/GetMyAthleteProfile", {}, token)
+    if not report.check("Athlete has an athlete profile", error is None, error):
+        return
+    content = video.read_bytes()
+    request = {"athleteId": profile["athlete"]["id"], "movementType": "MOVEMENT_TYPE_SQUAT", "contentType": "video/mp4",
+               "contentLength": len(content), "durationMs": duration_ms}
+    upload, error = timed("CreateVideoUpload", lambda: rpc.call(f"{service}/CreateVideoUpload", request, token))
+    if not report.check("CreateVideoUpload", error is None, error):
+        return
+    target = upload["target"]
+    report.check("Upload URL points to the private videos bucket", PRIVATE_VIDEOS_BUCKET in target["url"])
+    status, headers, _ = http(
+        "OPTIONS", target["url"], headers={"Origin": origin, "Access-Control-Request-Method": "PUT", "Access-Control-Request-Headers": "content-type"}
+    )
+    report.check("Video CORS preflight from the preview", headers.get("access-control-allow-origin") == origin, f"status={status}")
+    status, _, _ = timed("PUT to the bucket", lambda: http("PUT", target["url"], content, target.get("headers", {})))
+    if not report.check("Real PUT of the video", status == 200, f"status={status} size={len(content)}"):
+        return
+    confirmed, error = timed("ConfirmVideoUpload", lambda: rpc.call(f"{service}/ConfirmVideoUpload", {"uploadId": upload["uploadId"]}, token))
+    if not report.check("ConfirmVideoUpload creates a PENDING analysis", error is None and confirmed["analysis"]["status"] == "ANALYSIS_STATUS_PENDING", error):
+        return
+    analysis_id = confirmed["analysis"]["id"]
+    video_url = ""
+    try:
+        again, error = rpc.call(f"{service}/ConfirmVideoUpload", {"uploadId": upload["uploadId"]}, token)
+        report.check("Confirming again returns the same analysis", error is None and again["analysis"]["id"] == analysis_id, error)
+        events, error = rpc.stream(f"{service}/WatchAnalysis", {"analysisId": analysis_id}, token)
+        stages = [message["progress"].get("stage") for _, message in events if "progress" in message]
+        finished = events[-1][1].get("finished") if events else None
+        if events:
+            timings.append(("WatchAnalysis first event", events[0][0]))
+            timings.append(("WatchAnalysis until the result", events[-1][0]))
+        report.check(
+            "WatchAnalysis streams progress and ends PROCESSED",
+            error is None and finished and finished["status"] == "ANALYSIS_STATUS_PROCESSED",
+            error or f"{len(events)} events, stages={sorted(set(filter(None, stages)))}, risk={finished and finished.get('riskLevel')}",
+        )
+        detail, error = rpc.call(f"{service}/GetAnalysis", {"analysisId": analysis_id}, token)
+        samples = len(detail["analysis"].get("angleSamples", [])) if detail else 0
+        report.check("GetAnalysis has angle samples and risk assessment", error is None and samples and "riskAssessment" in detail["analysis"], error or f"{samples} samples")
+        playback, error = timed("GetVideoPlaybackUrl", lambda: rpc.call(f"{service}/GetVideoPlaybackUrl", {"analysisId": analysis_id}, token))
+        video_url = playback["video"]["url"] if playback else ""
+        status, _, body = http("GET", video_url, headers={"Range": "bytes=0-15"}) if video_url else (0, {}, b"")
+        report.check("Playback URL serves byte ranges of the same video", status == 206 and body == content[:16], f"status={status}")
+        listed, error = rpc.call(f"{service}/ListAthleteAnalyses", {"athleteId": profile["athlete"]["id"], "page": {"pageSize": 5}}, token)
+        report.check("ListAthleteAnalyses shows it first", error is None and listed["analyses"][0]["id"] == analysis_id, error)
+
+        opening, error = rpc.stream("kinesiapp.chat.v1.ChatService/StartConversation", {"analysisId": analysis_id}, token)
+        deltas = [m for _, m in opening if "textDelta" in m]
+        if opening:
+            timings.append(("StartConversation first delta", opening[0][0]))
+            timings.append(("StartConversation total", opening[-1][0]))
+        report.check("StartConversation streams the explanation", error is None and deltas and "assistantMessage" in opening[-1][1], error or f"{len(deltas)} deltas")
+        answer, error = rpc.stream(
+            "kinesiapp.chat.v1.ChatService/SendMessage", {"analysisId": analysis_id, "content": "¿Qué debo corregir primero?"}, token
+        )
+        if answer:
+            timings.append(("SendMessage first event", answer[0][0]))
+            timings.append(("SendMessage total", answer[-1][0]))
+        report.check(
+            "SendMessage streams the question and the answer",
+            error is None and answer and "userMessage" in answer[0][1] and "assistantMessage" in answer[-1][1],
+            error or f"{len(answer)} events",
+        )
+    finally:
+        _, error = timed("DeleteAnalysis", lambda: rpc.call(f"{service}/DeleteAnalysis", {"analysisId": analysis_id}, token))
+        report.check("DeleteAnalysis", error is None, error)
+        _, error = rpc.call(f"{service}/GetAnalysis", {"analysisId": analysis_id}, token)
+        report.check("Deleted analysis is NOT_FOUND", error and error["code"] == "not_found", error)
+    if video_url:
+        check_object_gone(report, "Deleted analysis video", video_url)
+    print("\nTimings")
+    for label, seconds in timings:
+        print(f"  {label:<34} {seconds:6.1f} s")
+
+
 def _password(variable: str, label: str) -> str:
     return os.environ.pop(variable, "") or getpass.getpass(f"{label} password: ")
 
@@ -387,25 +509,33 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", default=DEFAULT_URL)
     parser.add_argument("--origin", default=DEFAULT_ORIGIN)
-    parser.add_argument("--admin-email", required=True)
+    parser.add_argument("--admin-email")
     parser.add_argument("--athlete-email")
     parser.add_argument("--coach-email")
     parser.add_argument("--only", default=",".join(ALL_SECTIONS))
+    parser.add_argument("--video", type=Path)
+    parser.add_argument("--video-duration-ms", type=int)
     args = parser.parse_args()
     sections = set(args.only.split(","))
+    if sections & ADMIN_SECTIONS and not args.admin_email:
+        parser.error("these sections need --admin-email")
+    if "analysis" in sections and not (args.athlete_email and args.video and args.video_duration_ms):
+        parser.error("analysis needs --athlete-email, --video and --video-duration-ms")
     if sections & {"athlete", "team"} and not (args.athlete_email and args.coach_email):
         parser.error("athlete and team need --athlete-email and --coach-email")
 
     buf = shutil.which("buf") or str(BACKEND.parent / "KinesiApp-Frontend" / "node_modules" / ".bin" / ("buf.cmd" if os.name == "nt" else "buf"))
     rpc = RpcClient(args.url, buf, BACKEND / "contracts" / "proto")
     report = Report()
-    admin = Session(rpc, args.admin_email, _password("KINESI_ADMIN_PASSWORD", "Admin"))
+    admin = Session(rpc, args.admin_email, _password("KINESI_ADMIN_PASSWORD", "Admin")) if sections & ADMIN_SECTIONS else None
     if "account" in sections:
         account_section(rpc, report, admin, args.origin)
     if "admin" in sections:
         admin_section(rpc, report, admin)
-    if sections & {"athlete", "team"}:
+    athlete = None
+    if sections & {"athlete", "team", "analysis"}:
         athlete = Session(rpc, args.athlete_email, _password("KINESI_ATHLETE_PASSWORD", "Athlete"))
+    if sections & {"athlete", "team"}:
         coach = Session(rpc, args.coach_email, _password("KINESI_COACH_PASSWORD", "Coach"))
         managed = athlete_section(rpc, report, admin, athlete, coach, args.origin) if "athlete" in sections else None
         managed_id, avatar_url = managed if managed else (None, None)
@@ -417,6 +547,8 @@ def main() -> int:
                 delete_managed_athlete(rpc, report, coach, managed_id, avatar_url)
     if "ai" in sections:
         ai_section(rpc, report, admin)
+    if "analysis" in sections:
+        analysis_section(rpc, report, athlete, args.video, args.video_duration_ms, args.origin)
     if "refresh" in sections:
         refresh_section(rpc, report, admin)
     return report.summary()
