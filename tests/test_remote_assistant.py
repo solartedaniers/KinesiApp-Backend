@@ -12,6 +12,8 @@ from kinesiapp.common.v1.errors_pb2 import ErrorReason
 from app.ai.grpc_web_transport import GrpcWebTransport
 from app.ai.remote_assistant import AssistantReply, RemoteAnalysisAssistant
 from app.core.domain_error import DomainError
+from app.models.chat import ChatMessage, ChatRole
+from app.models.user import UserRole
 from tests.ai_world import AI_TOKEN, abort_with_reason, ai_world, require_token
 
 FACTS = assistant_pb2.AnalysisFacts(risk_score=0.7, dominant_risk_pattern="rigid_landing")
@@ -53,25 +55,29 @@ def _collect(assistant: _Assistant, call):
 
 
 def test_the_explanation_arrives_in_parts_and_ends_with_the_full_reply() -> None:
-    events = _collect(_Assistant(), lambda remote: remote.explain(FACTS, identity_pb2.USER_ROLE_ATHLETE))
+    events = _collect(_Assistant(), lambda remote: remote.explain(FACTS, UserRole.ATHLETE))
 
     assert events == ["Tu aterrizaje ", "es rígido.", AssistantReply("Tu aterrizaje es rígido.", "v3")]
 
 
 def test_the_question_travels_with_the_history_and_the_audience() -> None:
     assistant = _Assistant()
-    history = [assistant_pb2.ConversationTurn(role=chat_pb2.CHAT_ROLE_ASSISTANT, content="Hola")]
+    history = [ChatMessage(role=ChatRole.ASSISTANT, content="Hola"), ChatMessage(role=ChatRole.USER, content="¿Y?")]
 
-    _collect(assistant, lambda remote: remote.answer(FACTS, identity_pb2.USER_ROLE_COACH, history, "¿Es grave?"))
+    _collect(assistant, lambda remote: remote.answer(FACTS, UserRole.COACH, history, "¿Es grave?"))
 
     sent = assistant.questions[0]
-    assert (sent.question, sent.audience, list(sent.history)) == ("¿Es grave?", identity_pb2.USER_ROLE_COACH, history)
+    assert (sent.question, sent.audience) == ("¿Es grave?", identity_pb2.USER_ROLE_COACH)
+    assert [(turn.role, turn.content) for turn in sent.history] == [
+        (chat_pb2.CHAT_ROLE_ASSISTANT, "Hola"),
+        (chat_pb2.CHAT_ROLE_USER, "¿Y?"),
+    ]
     assert sent.facts == FACTS
 
 
 @pytest.mark.parametrize("assistant", [_Assistant(fail=True), _Assistant(finish=False)], ids=["ai-error", "no-reply"])
 def test_a_failure_or_a_missing_final_reply_is_assistant_unavailable(assistant: _Assistant) -> None:
     with pytest.raises(DomainError) as caught:
-        _collect(assistant, lambda remote: remote.explain(FACTS, identity_pb2.USER_ROLE_ATHLETE))
+        _collect(assistant, lambda remote: remote.explain(FACTS, UserRole.ATHLETE))
 
     assert caught.value.reason == ErrorReason.ERROR_REASON_ASSISTANT_UNAVAILABLE
