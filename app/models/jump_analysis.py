@@ -58,6 +58,10 @@ class JumpAnalysis(Base):
     progress_updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+    # Quién procesa el análisis y hasta cuándo: otra instancia solo lo reclama con el lease vencido, y un
+    # intento que ya no es el dueño no puede escribir
+    processing_attempt_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    processing_lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Nombre del ErrorReason del contrato (p. ej. "VIDEO_UNREADABLE") cuando status es FAILED
     failure_reason: Mapped[str | None] = mapped_column(String(50), nullable=True)
     risk_score: Mapped[float | None] = mapped_column(Float, nullable=True)
