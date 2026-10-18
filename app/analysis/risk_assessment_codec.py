@@ -7,7 +7,8 @@ from pydantic import BaseModel
 # Es la forma del JSON de jump_analyses.risk_details que ya guardaba el REST; la IA usa la misma
 RISK_DETAILS_FORMAT_VERSION = 1
 
-_SIGNAL_BY_JOINT = {
+# Nombre de cada articulación en el JSON de riesgo y en joint_angle_measurements.joint_name
+JOINT_NAMES = {
     movement_pb2.JOINT_ANGLE_KNEE_FLEXION: "knee_flexion",
     movement_pb2.JOINT_ANGLE_TRUNK_INCLINATION: "trunk_inclination",
 }
@@ -102,7 +103,7 @@ def _pattern_details(pattern: movement_pb2.RiskPattern) -> dict[str, Any]:
         "repetitions_triggered": pattern.repetitions_triggered,
         "signals": {
             signal.code: {
-                "signal": _SIGNAL_BY_JOINT[signal.joint],
+                "signal": JOINT_NAMES[signal.joint],
                 "direction": _DIRECTIONS[signal.direction],
                 "onset_deg": signal.onset_degrees,
                 "saturation_deg": signal.saturation_degrees,
@@ -148,7 +149,7 @@ def _signal(code: str, signal: _Signal) -> movement_pb2.RiskSignal:
     measured = signal.measured_deg
     return movement_pb2.RiskSignal(
         code=code,
-        joint=_key_for(_SIGNAL_BY_JOINT, signal.signal),
+        joint=_key_for(JOINT_NAMES, signal.signal),
         direction=_key_for(_DIRECTIONS, signal.direction),
         onset_degrees=signal.onset_deg,
         saturation_degrees=signal.saturation_deg,
