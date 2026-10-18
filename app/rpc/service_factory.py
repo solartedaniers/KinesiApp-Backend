@@ -20,7 +20,8 @@ from app.admin.user_activation import UserActivation
 from app.admin.user_directory import UserDirectory
 from app.admin.user_provisioning import UserProvisioning
 from app.admin.user_role_assignment import UserRoleAssignment
-from app.ai.lifecycle import UnavailableAiLifecycle
+from app.ai.remote_lifecycle import RemoteAiLifecycle
+from app.ai.transport_factory import build_ai_transport
 from app.athletes.athlete_administration import AthleteAdministration
 from app.athletes.athlete_directory import AthleteDirectory
 from app.athletes.inputs import AthleteInputRules
@@ -54,6 +55,7 @@ from app.rpc.system_servicer import SystemServicer
 from app.rpc.team_servicer import TeamServicer
 from app.rpc.user_admin_servicer import UserAdminServicer
 from app.services.email_domain_checker import EmailDomainChecker
+from app.settings.ai import AiClientSettings
 from app.settings.athlete import AthleteSettings
 from app.settings.auth import AuthSettings, PasswordPolicySettings
 from app.settings.chat import ChatSettings
@@ -93,6 +95,8 @@ class RpcServiceFactory:
         self._avatar_files = AvatarFiles(self._images, tickets, self._media_settings.MAX_AVATAR_UPLOAD_BYTES)
         self._athlete_settings = AthleteSettings()
         self._page_rules = PageRules.from_settings(PaginationSettings())
+        self._ai_settings = AiClientSettings()
+        self._ai = build_ai_transport(self._ai_settings)
 
     def registrations(self) -> list[ServicerRegistration]:
         return [
@@ -105,13 +109,20 @@ class RpcServiceFactory:
             partial(team_pb2_grpc.add_TeamServiceServicer_to_server, self._teams()),
         ]
 
+    async def aclose(self) -> None:
+        await self._ai.aclose()
+
     @staticmethod
     def _clock() -> datetime:
         return datetime.now(timezone.utc)
 
     def _system(self) -> SystemServicer:
         client_policy = build_client_policy(self._media_settings, self._password_policy, self._athlete_settings, ChatSettings())
-        return SystemServicer(self._clock, client_policy, UnavailableAiLifecycle())
+        ai = self._ai_settings
+        lifecycle = RemoteAiLifecycle(
+            self._ai, ai.WAKE_UP_TIMEOUT_SECONDS, ai.WAKE_UP_CALL_TIMEOUT_SECONDS, ai.WAKE_UP_RETRY_INTERVAL_SECONDS
+        )
+        return SystemServicer(self._clock, client_policy, lifecycle)
 
     def _auth(self) -> AuthServicer:
         hasher, codes, mailer = self._hasher, self._codes, self._mailer

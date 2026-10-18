@@ -42,8 +42,8 @@ async def serve(settings: GrpcServerSettings, auth_settings: AuthSettings, datab
     engine = build_async_engine(database_settings)
     session_factory = build_session_factory(engine)
     verifier = JwtAccessTokenVerifier(auth_settings, session_factory)
-    registrations = RpcServiceFactory(session_factory, auth_settings).registrations()
-    server = build_server(settings, build_interceptors(verifier), registrations)
+    factory = RpcServiceFactory(session_factory, auth_settings)
+    server = build_server(settings, build_interceptors(verifier), factory.registrations())
     await server.start()
     logger.info("gRPC server listening on %s:%s", settings.HOST, settings.PORT)
 
@@ -55,6 +55,7 @@ async def serve(settings: GrpcServerSettings, auth_settings: AuthSettings, datab
         await stopping.wait()
     finally:
         await server.stop(settings.SHUTDOWN_GRACE_SECONDS)
+        await factory.aclose()
         await engine.dispose()
         logger.info("gRPC server stopped")
 
