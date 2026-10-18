@@ -9,6 +9,9 @@ os.environ.setdefault("OTP_EXPIRE_MINUTES", "10")
 os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-with-enough-length")
 # Postgres ficticio: los tests usan SQLite en memoria y, al ganarle al .env, nunca tocan Neon
 os.environ.setdefault("POSTGRES_HOST", "postgres.test")
+# IA ficticia: ninguna prueba llega a la IA real aunque el .env la tenga
+os.environ["AI_SERVICE_URL"] = "http://ai.test"
+os.environ["AI_SERVICE_TOKEN"] = "test-ai-service-token-with-32-characters"
 os.environ.setdefault("POSTGRES_USER", "test")
 os.environ.setdefault("POSTGRES_PASSWORD", "test-password")
 os.environ.setdefault("POSTGRES_DB", "kinesiapp_test")
