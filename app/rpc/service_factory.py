@@ -7,6 +7,7 @@ from kinesiapp.account.v1 import account_pb2_grpc
 from kinesiapp.admin.v1 import user_admin_pb2_grpc
 from kinesiapp.athlete.v1 import athlete_profile_service_pb2_grpc, managed_athlete_service_pb2_grpc
 from kinesiapp.auth.v1 import auth_pb2_grpc
+from kinesiapp.chat.v1 import chat_pb2_grpc
 from kinesiapp.system.v1 import system_pb2_grpc
 from kinesiapp.team.v1 import team_pb2_grpc
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -20,8 +21,11 @@ from app.admin.user_activation import UserActivation
 from app.admin.user_directory import UserDirectory
 from app.admin.user_provisioning import UserProvisioning
 from app.admin.user_role_assignment import UserRoleAssignment
+from app.ai.remote_assistant import RemoteAnalysisAssistant
 from app.ai.remote_lifecycle import RemoteAiLifecycle
 from app.ai.transport_factory import build_ai_transport
+from app.analysis.risk_assessment_codec import RiskAssessmentCodec
+from app.analysis.risk_level import RiskLevelClassifier
 from app.athletes.athlete_administration import AthleteAdministration
 from app.athletes.athlete_directory import AthleteDirectory
 from app.athletes.inputs import AthleteInputRules
@@ -40,6 +44,12 @@ from app.auth.registration import Registration
 from app.auth.session_issuer import SessionIssuer
 from app.auth.session_management import SessionManagement
 from app.auth.session_tokens import SessionTokenService
+from app.chat.analysis_facts import AnalysisFactsBuilder
+from app.chat.conversation_history import ConversationHistory
+from app.chat.conversation_opening import ConversationOpening
+from app.chat.inputs import ChatInputRules
+from app.chat.question_answering import QuestionAnswering
+from app.chat.usage_limits import ChatUsageLimits
 from app.core.pagination import PageRules
 from app.identity.password_policy import PasswordPolicy
 from app.mail.auth_email_service import AuthEmailService
@@ -49,6 +59,7 @@ from app.rpc.account_servicer import AccountServicer
 from app.rpc.athlete_messages import AthleteMessages
 from app.rpc.athlete_profile_servicer import AthleteProfileServicer
 from app.rpc.auth_servicer import AuthServicer
+from app.rpc.chat_servicer import ChatServicer
 from app.rpc.client_policy import build_client_policy
 from app.rpc.managed_athlete_servicer import ManagedAthleteServicer
 from app.rpc.system_servicer import SystemServicer
@@ -61,6 +72,7 @@ from app.settings.auth import AuthSettings, PasswordPolicySettings
 from app.settings.chat import ChatSettings
 from app.settings.mail import MailSettings
 from app.settings.pagination import PaginationSettings
+from app.settings.risk import RiskSettings
 from app.settings.storage import MediaSettings, StorageSettings
 from app.storage.avatar_files import AvatarFiles
 from app.storage.avatar_links import AvatarLinks
@@ -97,6 +109,10 @@ class RpcServiceFactory:
         self._page_rules = PageRules.from_settings(PaginationSettings())
         self._ai_settings = AiClientSettings()
         self._ai = build_ai_transport(self._ai_settings)
+        self._chat_settings = ChatSettings()
+        risk = RiskSettings()
+        self._risk_levels = RiskLevelClassifier(risk.RISK_LEVEL_MODERATE, risk.RISK_LEVEL_HIGH)
+        self._risk_codec = RiskAssessmentCodec()
 
     def registrations(self) -> list[ServicerRegistration]:
         return [
@@ -107,6 +123,7 @@ class RpcServiceFactory:
             partial(athlete_profile_service_pb2_grpc.add_AthleteProfileServiceServicer_to_server, self._athlete_profiles()),
             partial(managed_athlete_service_pb2_grpc.add_ManagedAthleteServiceServicer_to_server, self._managed_athletes()),
             partial(team_pb2_grpc.add_TeamServiceServicer_to_server, self._teams()),
+            partial(chat_pb2_grpc.add_ChatServiceServicer_to_server, self._chat()),
         ]
 
     async def aclose(self) -> None:
@@ -117,7 +134,7 @@ class RpcServiceFactory:
         return datetime.now(timezone.utc)
 
     def _system(self) -> SystemServicer:
-        client_policy = build_client_policy(self._media_settings, self._password_policy, self._athlete_settings, ChatSettings())
+        client_policy = build_client_policy(self._media_settings, self._password_policy, self._athlete_settings, self._chat_settings)
         ai = self._ai_settings
         lifecycle = RemoteAiLifecycle(
             self._ai, ai.WAKE_UP_TIMEOUT_SECONDS, ai.WAKE_UP_CALL_TIMEOUT_SECONDS, ai.WAKE_UP_RETRY_INTERVAL_SECONDS
@@ -187,3 +204,15 @@ class RpcServiceFactory:
 
     def _teams(self) -> TeamServicer:
         return TeamServicer(TeamCatalog(self._uow_factory), TeamMembership(self._uow_factory))
+
+    def _chat(self) -> ChatServicer:
+        chat = self._chat_settings
+        facts = AnalysisFactsBuilder(self._risk_codec, self._risk_levels)
+        assistant = RemoteAnalysisAssistant(self._ai, self._ai_settings.ASSISTANT_TIMEOUT_SECONDS)
+        limits = ChatUsageLimits(chat.CHAT_RATE_LIMIT_PER_USER_PER_HOUR, chat.CHAT_RATE_LIMIT_GLOBAL_PER_MINUTE, self._clock)
+        return ChatServicer(
+            ChatInputRules(chat.CHAT_MESSAGE_MAX_CHARS),
+            ConversationHistory(self._uow_factory),
+            ConversationOpening(self._uow_factory, facts, assistant, limits),
+            QuestionAnswering(self._uow_factory, facts, assistant, limits),
+        )
