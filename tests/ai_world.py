@@ -14,9 +14,20 @@ import grpc
 from google.protobuf import any_pb2
 from google.rpc import error_details_pb2, status_pb2
 from grpc_status import rpc_status
+from kinesiapp.common.v1.errors_pb2 import ErrorReason
+
+from app.ai.lifecycle import AiState
+from app.core.domain_error import DomainError
 
 AI_TOKEN = "test-ai-service-token-with-32-characters"
 _FRAME_HEADER_SIZE = 5
+
+
+class UnreachableAi:
+    """AiLifecycle de prueba para los servicers que no hablan con la IA: siempre responde que no está."""
+
+    async def wake_up(self) -> AiState:
+        raise DomainError(ErrorReason.ERROR_REASON_AI_UNAVAILABLE, "The AI service is not available")
 
 
 async def abort_with_reason(context: grpc.aio.ServicerContext, code: grpc.StatusCode, reason: str) -> None:

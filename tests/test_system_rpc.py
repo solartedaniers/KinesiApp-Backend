@@ -6,7 +6,7 @@ import pytest
 from kinesiapp.common.v1 import ai_state_pb2
 from kinesiapp.system.v1 import system_pb2, system_pb2_grpc
 
-from app.ai.lifecycle import AiState, UnavailableAiLifecycle
+from app.ai.lifecycle import AiState
 from app.identity.password_policy import PasswordPolicy
 from app.rpc.client_policy import build_client_policy
 from app.rpc.interceptors.errors import ErrorInterceptor
@@ -15,6 +15,7 @@ from app.settings.athlete import AthleteSettings
 from app.settings.auth import PasswordPolicySettings
 from app.settings.chat import ChatSettings
 from app.settings.storage import MediaSettings
+from tests.ai_world import UnreachableAi
 from tests.grpc_harness import error_info, serving
 
 FIXED_TIME = datetime(2026, 10, 16, 12, 30, tzinfo=timezone.utc)
@@ -48,14 +49,14 @@ def _stub_call(ai_lifecycle, call):
 
 
 def test_ping_echoes_the_message_with_the_server_time() -> None:
-    response = _stub_call(UnavailableAiLifecycle(), lambda stub: stub.Ping(system_pb2.PingRequest(message="hola")))
+    response = _stub_call(UnreachableAi(), lambda stub: stub.Ping(system_pb2.PingRequest(message="hola")))
 
     assert response.message == "hola"
     assert response.server_time.ToDatetime(tzinfo=timezone.utc) == FIXED_TIME
 
 
 def test_client_policy_comes_from_configuration() -> None:
-    policy = _stub_call(UnavailableAiLifecycle(), lambda stub: stub.GetClientPolicy(system_pb2.GetClientPolicyRequest()))
+    policy = _stub_call(UnreachableAi(), lambda stub: stub.GetClientPolicy(system_pb2.GetClientPolicyRequest()))
 
     assert policy.video.max_duration_seconds == 40
     assert policy.video.max_size_bytes == 50_000_000
@@ -76,7 +77,7 @@ def test_wake_up_ai_is_unavailable_until_the_ai_service_exists() -> None:
             await stub.WakeUpAi(system_pb2.WakeUpAiRequest())
         return raised.value
 
-    error = _stub_call(UnavailableAiLifecycle(), call)
+    error = _stub_call(UnreachableAi(), call)
 
     assert error.code() == grpc.StatusCode.UNAVAILABLE
     assert error_info(error).reason == "AI_UNAVAILABLE"

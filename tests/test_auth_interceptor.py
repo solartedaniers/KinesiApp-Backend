@@ -16,8 +16,8 @@ from app.models.user import UserRole
 from app.rpc.access_policy import access_for
 from app.rpc.interceptors.auth import AuthInterceptor
 from app.rpc.interceptors.errors import ErrorInterceptor
-from app.ai.lifecycle import UnavailableAiLifecycle
 from app.rpc.system_servicer import SystemServicer
+from tests.ai_world import UnreachableAi
 from tests.grpc_harness import error_info, serving
 
 TOKENS = {
@@ -37,7 +37,7 @@ class _PrincipalSystem(SystemServicer):
     """Respondo WakeUpAi solo para comprobar quién llegó al handler."""
 
     def __init__(self, seen: list[Principal]) -> None:
-        super().__init__(lambda: datetime.now(timezone.utc), GetClientPolicyResponse(), UnavailableAiLifecycle())
+        super().__init__(lambda: datetime.now(timezone.utc), GetClientPolicyResponse(), UnreachableAi())
         self._seen = seen
 
     async def WakeUpAi(self, request, context):

@@ -9,14 +9,14 @@ from kinesiapp.system.v1.system_pb2 import GetClientPolicyResponse
 
 from app.rpc.interceptors.errors import ErrorInterceptor
 from app.rpc.interceptors.logging import LoggingInterceptor
-from app.ai.lifecycle import UnavailableAiLifecycle
 from app.rpc.system_servicer import SystemServicer
+from tests.ai_world import UnreachableAi
 from tests.grpc_harness import serving
 
 
 async def _call_ping_and_wake_up() -> None:
     def register(server: grpc.aio.Server) -> None:
-        system_pb2_grpc.add_SystemServiceServicer_to_server(SystemServicer(lambda: datetime.now(timezone.utc), GetClientPolicyResponse(), UnavailableAiLifecycle()), server)
+        system_pb2_grpc.add_SystemServiceServicer_to_server(SystemServicer(lambda: datetime.now(timezone.utc), GetClientPolicyResponse(), UnreachableAi()), server)
 
     async with serving(register, [LoggingInterceptor(), ErrorInterceptor()]) as channel:
         stub = system_pb2_grpc.SystemServiceStub(channel)
