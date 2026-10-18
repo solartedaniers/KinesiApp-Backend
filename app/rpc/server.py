@@ -59,6 +59,17 @@ async def serve(settings: GrpcServerSettings, auth_settings: AuthSettings, datab
         logger.info("gRPC server stopped")
 
 
+# Estas librerías registran las peticiones con su URL y sus encabezados firmados en DEBUG (httpx ya en
+# INFO); las dejo en WARNING para que subir el nivel del log nunca exponga una firma
+QUIET_HTTP_LOGGERS = ("botocore", "boto3", "s3transfer", "urllib3", "httpx", "httpcore")
+
+
+def configure_logging(level: int = logging.INFO) -> None:
+    logging.basicConfig(level=level)
+    for name in QUIET_HTTP_LOGGERS:
+        logging.getLogger(name).setLevel(logging.WARNING)
+
+
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    configure_logging()
     asyncio.run(serve(GrpcServerSettings(), AuthSettings(), DatabaseSettings()))
