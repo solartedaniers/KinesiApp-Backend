@@ -12,7 +12,7 @@ NOW = datetime(2026, 10, 2, 12, 0, tzinfo=timezone.utc)
 
 
 def _conversation(db, user_id: int) -> int:
-    analysis = JumpAnalysis(athlete_id=1, video_reference="v.mp4")
+    analysis = JumpAnalysis(athlete_id=1, video_reference=f"v-{user_id}.mp4")
     db.add(analysis)
     db.flush()
     conversation = ChatConversation(jump_analysis_id=analysis.id, user_id=user_id)
