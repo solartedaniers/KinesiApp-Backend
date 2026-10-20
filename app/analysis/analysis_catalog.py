@@ -9,6 +9,7 @@ from app.core.domain_error import DomainError
 from app.identity.principal import Principal
 from app.models.jump_analysis import JumpAnalysis
 from app.repositories.unit_of_work import UnitOfWork
+from app.teams.team_catalog import visible_team
 
 
 @dataclass(frozen=True)
@@ -36,9 +37,13 @@ class AnalysisCatalog:
             # Pido uno de más para saber si hay otra página sin contar toda la tabla
             return _page(await uow.analyses.list_by_athlete(athlete_id, before_id, limit + 1), limit)
 
-    async def list_coached(self, principal: Principal, before_id: int, limit: int) -> AnalysisPage:
+    async def list_coached(
+        self, principal: Principal, before_id: int, limit: int, team_id: int | None = None
+    ) -> AnalysisPage:
         async with self._uow_factory() as uow:
-            return _page(await uow.analyses.list_by_coach(principal.user_id, before_id, limit + 1), limit)
+            if team_id is not None:
+                await visible_team(uow, principal, team_id)
+            return _page(await uow.analyses.list_by_coach(principal.user_id, before_id, limit + 1, team_id), limit)
 
 
 def _page(analyses: list[JumpAnalysis], limit: int) -> AnalysisPage:

@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 from app.models.athlete import AthleteProfile
 from app.models.chat import ChatConversation
 from app.models.jump_analysis import JointAngleMeasurement, JumpAnalysis, JumpAnalysisStatus
+from app.models.team import team_members
 from app.repositories.async_base_repository import AsyncBaseRepository
 
 
@@ -67,8 +68,13 @@ class AsyncAnalysisRepository(AsyncBaseRepository[JumpAnalysis]):
     async def list_by_athlete(self, athlete_id: int, before_id: int, limit: int) -> list[JumpAnalysis]:
         return await self._newest_first(_with_athlete().where(JumpAnalysis.athlete_id == athlete_id), before_id, limit)
 
-    async def list_by_coach(self, coach_id: int, before_id: int, limit: int) -> list[JumpAnalysis]:
+    async def list_by_coach(self, coach_id: int, before_id: int, limit: int, team_id: int | None = None) -> list[JumpAnalysis]:
         query = _with_athlete().join(JumpAnalysis.athlete).where(AthleteProfile.coach_id == coach_id)
+        if team_id is not None:
+            # Sigo exigiendo el coach: un deportista que cambió de entrenador puede seguir en un equipo viejo
+            query = query.join(team_members, team_members.c.athlete_id == AthleteProfile.id).where(
+                team_members.c.team_id == team_id
+            )
         return await self._newest_first(query, before_id, limit)
 
     def add_measurements(self, measurements: list[JointAngleMeasurement]) -> None:

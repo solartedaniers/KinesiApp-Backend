@@ -16,6 +16,7 @@ from app.identity.principal import current_principal
 from app.models.jump_analysis import JumpAnalysis
 from app.rpc.analysis_messages import AnalysisMessages, progress
 from app.rpc.proto_values import signed_url, upload_target
+from app.teams.inputs import TeamIdInput
 
 
 class AnalysisServicer(analysis_pb2_grpc.AnalysisServiceServicer):
@@ -91,7 +92,8 @@ class AnalysisServicer(analysis_pb2_grpc.AnalysisServiceServicer):
         self, request: analysis_pb2.ListCoachedAnalysesRequest, context: grpc.aio.ServicerContext
     ) -> analysis_pb2.ListCoachedAnalysesResponse:
         page = self._pages.parse(request.page.page_size, request.page.page_token)
-        result = await self._catalog.list_coached(current_principal(), page.after_id, page.limit)
+        team_id = TeamIdInput.model_validate({"team_id": request.team_id}).team_id if request.HasField("team_id") else None
+        result = await self._catalog.list_coached(current_principal(), page.after_id, page.limit, team_id)
         analyses, next_page = self._page(result)
         return analysis_pb2.ListCoachedAnalysesResponse(analyses=analyses, page=next_page)
 

@@ -33,6 +33,7 @@ from app.analysis.video_uploads import VideoUploads
 from app.core.pagination import PageRules
 from app.models.athlete import AthleteProfile, Gender
 from app.models.jump_analysis import AnalysisStage, JumpAnalysis, JumpAnalysisStatus, MovementType
+from app.models.team import Team
 from app.models.user import User, UserRole
 from app.rpc.analysis_messages import AnalysisMessages
 from app.rpc.analysis_servicer import AnalysisServicer
@@ -480,3 +481,31 @@ def test_listings_are_paginated_newest_first_and_respect_who_may_see_them(tmp_pa
     assert not first.analyses[0].HasField("risk_score")
     assert error_info(stranger).reason == "FORBIDDEN"
     assert not_coach.code() is grpc.StatusCode.PERMISSION_DENIED
+
+
+def test_coached_listing_filters_by_one_of_the_coach_teams(tmp_path: Path) -> None:
+    async def scenario(lab: _Lab):
+        people = await _people(lab.world)
+        async with lab.world.session_factory() as session:
+            for index, profile_id in enumerate([people.profile_id, people.managed_id, people.profile_id]):
+                session.add(JumpAnalysis(athlete_id=profile_id, video_reference=f"{BUCKET_URL}videos/{index}",
+                                         status=JumpAnalysisStatus.FAILED, failure_reason="NO_MOVEMENT_DETECTED"))
+            managed = await session.get(AthleteProfile, people.managed_id)
+            own_team = Team(owner_id=people.coach.id, name="Sub-17", athletes=[managed])
+            foreign_team = Team(owner_id=people.stranger.id, name="Ajeno")
+            session.add_all([own_team, foreign_team])
+            await session.commit()
+            own_id, foreign_id = own_team.id, foreign_team.id
+        coach = bearer(people.coach)
+        filtered = await lab.stub.ListCoachedAnalyses(analysis_pb2.ListCoachedAnalysesRequest(team_id=own_id), metadata=coach)
+        foreign = await _failure(lab.stub.ListCoachedAnalyses(
+            analysis_pb2.ListCoachedAnalysesRequest(team_id=foreign_id), metadata=coach
+        ))
+        invalid = await _failure(lab.stub.ListCoachedAnalyses(analysis_pb2.ListCoachedAnalysesRequest(team_id=0), metadata=coach))
+        return filtered, foreign, invalid
+
+    filtered, foreign, invalid = _run(tmp_path, scenario)
+
+    assert [a.id for a in filtered.analyses] == [2] and filtered.page.next_page_token == ""
+    assert error_info(foreign).reason == "NOT_FOUND"
+    assert invalid.code() is grpc.StatusCode.INVALID_ARGUMENT
