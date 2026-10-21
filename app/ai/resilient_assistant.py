@@ -4,8 +4,7 @@ from collections.abc import AsyncIterator, Callable
 from kinesiapp.ai.v1 import assistant_pb2
 
 from app.ai.lifecycle import AiLifecycle
-from app.ai.remote_assistant import AnalysisAssistant, AssistantEvent
-from app.core.domain_error import DomainError
+from app.ai.remote_assistant import AnalysisAssistant, AssistantEvent, AssistantFailure
 from app.models.chat import ChatMessage
 from app.models.user import UserRole
 
@@ -13,11 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 class ResilientAssistant:
-    """Decorator de AnalysisAssistant: despierto la IA antes del stream y, si falla antes del primer texto, reintento.
+    """Decorator de AnalysisAssistant: despierto la IA antes del stream y, si la conexión se corta antes del primer
+    texto, reintento.
 
-    Despierto primero porque el ingress de Azure corta el stream que despierta la réplica. Reintento porque el 21-oct
-    una pregunta falló con la IA despierta (Gemini no dio texto en 30 s) y la misma pregunta, repetida, salió en 3 s.
-    A mitad de la respuesta no reintento: el cliente ya recibió texto y otro intento lo duplicaría.
+    Despierto primero porque el ingress de Azure corta el stream que despierta la réplica. Solo reintento cortes de
+    conexión: si la IA respondió con un error ya probó sus dos modelos, y otro intento solo alargaba la espera
+    (el 21-oct, 48 s por pregunta). A mitad de la respuesta tampoco: el cliente ya recibió texto y lo duplicaría.
     """
 
     def __init__(self, lifecycle: AiLifecycle, assistant: AnalysisAssistant, attempts: int) -> None:
@@ -42,7 +42,7 @@ class ResilientAssistant:
                     sent = True
                     yield event
                 return
-            except DomainError as error:
-                if sent or attempt == self._attempts:
+            except AssistantFailure as error:
+                if sent or not error.retryable or attempt == self._attempts:
                     raise
-                logger.warning("Assistant attempt %d failed before any text, retrying: %s", attempt, error)
+                logger.warning("Assistant attempt %d lost the connection before any text, retrying: %s", attempt, error)

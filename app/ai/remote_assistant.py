@@ -30,9 +30,23 @@ class AssistantReply:
 # Cada evento es un fragmento de texto o, al final, la respuesta completa
 AssistantEvent = str | AssistantReply
 
+# Motivos que la IA manda cuando ya probó sus dos modelos: los paso tal cual para que la UI diga qué pasó
+_PASSED_THROUGH = {
+    ErrorReason.Name(reason).removeprefix("ERROR_REASON_"): reason
+    for reason in (ErrorReason.ERROR_REASON_ASSISTANT_BUSY, ErrorReason.ERROR_REASON_ASSISTANT_DAILY_LIMIT)
+}
+
+
+class AssistantFailure(DomainError):
+    """El asistente no respondió. retryable dice si vale otro intento: solo cuando se cortó la conexión con la IA."""
+
+    def __init__(self, reason: ErrorReason.ValueType, message: str, retryable: bool) -> None:
+        super().__init__(reason, message)
+        self.retryable = retryable
+
 
 class AnalysisAssistant(Protocol):
-    """El asistente que explica un análisis; si no puede responder, lanzo DomainError con ASSISTANT_UNAVAILABLE."""
+    """El asistente que explica un análisis; si no puede responder, lanzo AssistantFailure."""
 
     def explain(self, facts: assistant_pb2.AnalysisFacts, audience: UserRole) -> AsyncIterator[AssistantEvent]: ...
 
@@ -73,11 +87,20 @@ class RemoteAnalysisAssistant:
                     yield reply.text_delta
         except AiCallError as error:
             logger.warning("Assistant failed: %s", error)
-            raise _unavailable() from error
-        # Sin la respuesta final no tengo qué guardar: lo trato como un fallo del asistente
+            raise _failure(error) from error
+        # Sin la respuesta final no tengo qué guardar: el stream se cortó antes de terminar
         if not finished:
-            raise _unavailable()
+            raise _unavailable(retryable=True)
 
 
-def _unavailable() -> DomainError:
-    return DomainError(ErrorReason.ERROR_REASON_ASSISTANT_UNAVAILABLE, "The assistant is not available right now")
+def _failure(error: AiCallError) -> AssistantFailure:
+    if error.reason in _PASSED_THROUGH:
+        return AssistantFailure(_PASSED_THROUGH[error.reason], error.message, retryable=False)
+    # Con reason la IA respondió (ya probó su respaldo); sin reason no llegó a responder: corte de red o del ingress
+    return _unavailable(retryable=error.reason is None)
+
+
+def _unavailable(retryable: bool) -> AssistantFailure:
+    return AssistantFailure(
+        ErrorReason.ERROR_REASON_ASSISTANT_UNAVAILABLE, "The assistant is not available right now", retryable
+    )

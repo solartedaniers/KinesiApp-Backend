@@ -38,7 +38,7 @@ MAX_CHARS = 20
 class _FakeAssistant:
     """Asistente en memoria: cuenta las llamadas, puede tardar y puede fallar a mitad de la respuesta."""
 
-    def __init__(self, delay: float = 0.0, fail: bool = False) -> None:
+    def __init__(self, delay: float = 0.0, fail: ErrorReason.ValueType | None = None) -> None:
         self.delay = delay
         self.fail = fail
         self.explained = 0
@@ -60,7 +60,7 @@ class _FakeAssistant:
         yield text[:half]
         await asyncio.sleep(self.delay)
         if self.fail:
-            raise DomainError(ErrorReason.ERROR_REASON_ASSISTANT_UNAVAILABLE, "down")
+            raise DomainError(self.fail, "down")
         yield text[half:]
         yield AssistantReply(text, "prompt-v9")
 
@@ -183,17 +183,28 @@ def test_a_question_comes_back_saved_then_in_parts_and_carries_the_history(tmp_p
     ]
 
 
-def test_if_the_ai_fails_the_question_stays_saved_and_the_stream_ends_unavailable(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    ("reason", "code"),
+    [
+        (ErrorReason.ERROR_REASON_ASSISTANT_UNAVAILABLE, grpc.StatusCode.UNAVAILABLE),
+        (ErrorReason.ERROR_REASON_ASSISTANT_BUSY, grpc.StatusCode.RESOURCE_EXHAUSTED),
+        (ErrorReason.ERROR_REASON_ASSISTANT_DAILY_LIMIT, grpc.StatusCode.RESOURCE_EXHAUSTED),
+    ],
+    ids=["unavailable", "busy", "daily-limit"],
+)
+def test_if_the_ai_fails_the_question_stays_saved_and_the_stream_ends_with_its_reason(
+    tmp_path: Path, reason: ErrorReason.ValueType, code: grpc.StatusCode
+) -> None:
     async def scenario(world, stub, assistant):
         _, athlete, _, analysis_id = await _people(world)
         request = chat_pb2.SendMessageRequest(analysis_id=analysis_id, content="¿Y ahora?")
         replies, error = await _stream(stub.SendMessage(request, metadata=bearer(athlete)))
         return replies, error, await _messages(world)
 
-    replies, error, stored = _run(tmp_path, scenario, _FakeAssistant(fail=True))
+    replies, error, stored = _run(tmp_path, scenario, _FakeAssistant(fail=reason))
 
     assert replies[0].user_message.content == "¿Y ahora?"
-    assert error.code() is grpc.StatusCode.UNAVAILABLE and error_info(error).reason == "ASSISTANT_UNAVAILABLE"
+    assert error.code() is code and error_info(error).reason == ErrorReason.Name(reason).removeprefix("ERROR_REASON_")
     assert stored == [(ChatRole.USER, "¿Y ahora?")]
 
 
@@ -202,11 +213,12 @@ def test_retrying_an_unanswered_question_reuses_it_instead_of_saving_it_twice(tm
         _, athlete, _, analysis_id = await _people(world)
         request = chat_pb2.SendMessageRequest(analysis_id=analysis_id, content="¿Y ahora?")
         failed, _ = await _stream(stub.SendMessage(request, metadata=bearer(athlete)))
-        assistant.fail = False
+        assistant.fail = None
         retried, error = await _stream(stub.SendMessage(request, metadata=bearer(athlete)))
         return failed, retried, error, await _messages(world)
 
-    failed, retried, error, stored = _run(tmp_path, scenario, _FakeAssistant(fail=True), per_hour=1)
+    unavailable = _FakeAssistant(fail=ErrorReason.ERROR_REASON_ASSISTANT_UNAVAILABLE)
+    failed, retried, error, stored = _run(tmp_path, scenario, unavailable, per_hour=1)
 
     # Con un tope de una pregunta por hora, el reintento pasa porque no cuenta como pregunta nueva
     assert error is None

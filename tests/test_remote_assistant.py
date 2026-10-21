@@ -1,4 +1,4 @@
-"""Pruebo por gRPC-Web el adaptador del asistente: el texto llega por partes y los fallos son ASSISTANT_UNAVAILABLE."""
+"""Pruebo por gRPC-Web el adaptador del asistente: el texto llega por partes y cada fallo sale con su motivo."""
 
 import asyncio
 
@@ -10,8 +10,7 @@ from kinesiapp.common.v1 import chat_pb2, identity_pb2
 from kinesiapp.common.v1.errors_pb2 import ErrorReason
 
 from app.ai.grpc_web_transport import GrpcWebTransport
-from app.ai.remote_assistant import AssistantReply, RemoteAnalysisAssistant
-from app.core.domain_error import DomainError
+from app.ai.remote_assistant import AssistantFailure, AssistantReply, RemoteAnalysisAssistant
 from app.models.chat import ChatMessage, ChatRole
 from app.models.user import UserRole
 from tests.ai_world import AI_TOKEN, abort_with_reason, ai_world, require_token
@@ -20,7 +19,7 @@ FACTS = assistant_pb2.AnalysisFacts(risk_score=0.7, dominant_risk_pattern="rigid
 
 
 class _Assistant(assistant_pb2_grpc.AssistantServiceServicer):
-    def __init__(self, fail: bool = False, finish: bool = True) -> None:
+    def __init__(self, fail: str | None = None, finish: bool = True) -> None:
         self._fail = fail
         self._finish = finish
         self.questions: list[assistant_pb2.AnswerQuestionRequest] = []
@@ -30,7 +29,8 @@ class _Assistant(assistant_pb2_grpc.AssistantServiceServicer):
         for delta in ("Tu aterrizaje ", "es rígido."):
             yield assistant_pb2.ExplainAnalysisResponse(text_delta=delta)
         if self._fail:
-            await abort_with_reason(context, grpc.StatusCode.UNAVAILABLE, "ASSISTANT_UNAVAILABLE")
+            code = grpc.StatusCode.UNAVAILABLE if self._fail == "ASSISTANT_UNAVAILABLE" else grpc.StatusCode.RESOURCE_EXHAUSTED
+            await abort_with_reason(context, code, self._fail)
         if self._finish:
             reply = assistant_pb2.AssistantReply(content="Tu aterrizaje es rígido.", prompt_version="v3")
             yield assistant_pb2.ExplainAnalysisResponse(reply=reply)
@@ -75,9 +75,18 @@ def test_the_question_travels_with_the_history_and_the_audience() -> None:
     assert sent.facts == FACTS
 
 
-@pytest.mark.parametrize("assistant", [_Assistant(fail=True), _Assistant(finish=False)], ids=["ai-error", "no-reply"])
-def test_a_failure_or_a_missing_final_reply_is_assistant_unavailable(assistant: _Assistant) -> None:
-    with pytest.raises(DomainError) as caught:
+@pytest.mark.parametrize(
+    ("assistant", "reason", "retryable"),
+    [
+        (_Assistant(fail="ASSISTANT_UNAVAILABLE"), ErrorReason.ERROR_REASON_ASSISTANT_UNAVAILABLE, False),
+        (_Assistant(fail="ASSISTANT_BUSY"), ErrorReason.ERROR_REASON_ASSISTANT_BUSY, False),
+        (_Assistant(fail="ASSISTANT_DAILY_LIMIT"), ErrorReason.ERROR_REASON_ASSISTANT_DAILY_LIMIT, False),
+        (_Assistant(finish=False), ErrorReason.ERROR_REASON_ASSISTANT_UNAVAILABLE, True),
+    ],
+    ids=["ai-unavailable", "ai-busy", "ai-daily-limit", "cut-without-reply"],
+)
+def test_each_failure_keeps_its_reason_and_only_a_cut_stream_is_retryable(assistant: _Assistant, reason, retryable) -> None:
+    with pytest.raises(AssistantFailure) as caught:
         _collect(assistant, lambda remote: remote.explain(FACTS, UserRole.ATHLETE))
 
-    assert caught.value.reason == ErrorReason.ERROR_REASON_ASSISTANT_UNAVAILABLE
+    assert (caught.value.reason, caught.value.retryable) == (reason, retryable)

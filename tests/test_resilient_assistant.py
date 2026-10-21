@@ -1,4 +1,4 @@
-"""Pruebo que ResilientAssistant despierte la IA y reintente solo cuando falla antes de dar texto."""
+"""Pruebo que ResilientAssistant despierte la IA y reintente solo cuando la conexión se corta antes de dar texto."""
 
 import asyncio
 
@@ -6,7 +6,7 @@ import pytest
 from kinesiapp.common.v1.errors_pb2 import ErrorReason
 
 from app.ai.lifecycle import AiState
-from app.ai.remote_assistant import AssistantReply
+from app.ai.remote_assistant import AssistantFailure, AssistantReply
 from app.ai.resilient_assistant import ResilientAssistant
 from app.core.domain_error import DomainError
 from app.models.user import UserRole
@@ -26,7 +26,8 @@ class _Lifecycle:
 
 
 class _Assistant:
-    """Cada intento sigue un guion: "silent" falla sin texto, "cut" falla después de un fragmento, "ok" responde."""
+    """Cada intento sigue un guion: "silent" se corta sin texto, "cut" se corta después de un fragmento, "busy" es la
+    IA que ya probó sus dos modelos y "ok" responde."""
 
     def __init__(self, calls: list[str], script: list[str]) -> None:
         self._calls, self._script = calls, script
@@ -36,8 +37,10 @@ class _Assistant:
         self._calls.append(f"answer:{outcome}")
         if outcome == "cut":
             yield "Primera parte"
+        if outcome == "busy":
+            raise AssistantFailure(ErrorReason.ERROR_REASON_ASSISTANT_BUSY, outcome, retryable=False)
         if outcome != "ok":
-            raise DomainError(_UNAVAILABLE, outcome)
+            raise AssistantFailure(_UNAVAILABLE, outcome, retryable=True)
         yield "Respuesta"
         yield AssistantReply("Respuesta", "prompt-v1")
 
@@ -59,8 +62,7 @@ def test_the_ai_wakes_up_before_the_stream_opens() -> None:
     assert calls == ["wake_up", "answer:ok"] and received[0] == "Respuesta"
 
 
-def test_a_failure_before_any_text_is_retried_once_and_the_second_attempt_answers() -> None:
-    # Reproduzco el 21-oct: el modelo no dio texto y la misma pregunta, repetida, salió bien
+def test_a_connection_cut_before_any_text_is_retried_once_and_the_second_attempt_answers() -> None:
     calls: list[str] = []
 
     received = _ask(["silent", "ok"], calls)
@@ -92,3 +94,13 @@ def test_if_the_ai_does_not_wake_up_the_assistant_is_not_called() -> None:
         _ask(["ok"], calls, awake=False)
 
     assert caught.value.reason == ErrorReason.ERROR_REASON_AI_UNAVAILABLE and calls == ["wake_up"]
+
+
+def test_when_the_ai_already_tried_both_models_the_failure_is_not_retried() -> None:
+    # Reproduzco el 21-oct: reintentar sumaba otros 24 s sin cambiar el resultado
+    calls: list[str] = []
+
+    with pytest.raises(AssistantFailure) as caught:
+        _ask(["busy", "ok"], calls)
+
+    assert caught.value.reason == ErrorReason.ERROR_REASON_ASSISTANT_BUSY and calls == ["wake_up", "answer:busy"]
