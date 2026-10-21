@@ -1,8 +1,8 @@
 -r requirements.txt
--r requirements-grpc.txt
+-r requirements-grpc-build.txt
+# Las migraciones se corren desde local contra Neon (README.md): Alembic usa el driver síncrono
+alembic==1.14.0
+psycopg2-binary==2.9.10
 pytest==8.3.4
-httpx==0.28.1
-# tests/pose_fixtures.py lo importa directo; misma versión que fija kinesiapp-ai
-numpy==2.5.3
 # Motor asíncrono en memoria para probar los repositorios y servicios gRPC sin Neon
 aiosqlite==0.22.1

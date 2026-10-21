@@ -15,8 +15,8 @@ FROM envoyproxy/envoy:v1.40.0 AS envoy
 FROM python:3.12-slim
 WORKDIR /app
 COPY --from=envoy /usr/local/bin/envoy /usr/local/bin/envoy
-COPY requirements-grpc.txt .
-RUN pip install --no-cache-dir -r requirements-grpc.txt
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 COPY --from=codegen /build/generated ./generated
 COPY app app
 COPY deploy/grpc/envoy.yaml.template deploy/grpc/entrypoint.sh deploy/grpc/
