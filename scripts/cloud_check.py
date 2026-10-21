@@ -28,7 +28,12 @@ from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
 DEFAULT_URL = "https://kinesiapp-backend-grpc.onrender.com"
-DEFAULT_ORIGINS = ["https://kinesiapp-git-feature-grpc-frontend-solartedaniers-projects.vercel.app", "http://localhost:3000"]
+DEFAULT_ORIGINS = [
+    "https://kinesiapp.com",
+    "https://www.kinesiapp.com",
+    "https://kinesiapp-git-feature-grpc-frontend-solartedaniers-projects.vercel.app",
+    "http://localhost:3000",
+]
 FOREIGN_ORIGIN = "https://example.com"
 PRIVATE_IMAGES_BUCKET = "kinesiapp-dev-images"
 PRIVATE_VIDEOS_BUCKET = "kinesiapp-dev-videos"
