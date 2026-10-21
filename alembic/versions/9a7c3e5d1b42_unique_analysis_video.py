@@ -1,4 +1,4 @@
-"""Make jump_analyses.video_reference unique.
+"""Hago única jump_analyses.video_reference.
 
 Revision ID: 9a7c3e5d1b42
 Revises: 6e3d1a9b4f20

@@ -1,12 +1,12 @@
-"""Move profile photos from data URLs in the database to the images bucket (avatar_url).
+"""Muevo las fotos de perfil de data URLs en la base al bucket de imágenes (avatar_url).
 
 Revision ID: 151f2ecce8b2
 Revises: d28e52f6d0b7
 
-Las fotos existentes se suben al bucket de imágenes (S3_IMAGES_BUCKET) y en la base queda sólo su
-URL pública. Si hay fotos y el almacenamiento no está configurado, la migración se detiene en vez
-de perderlas. No usa las clases de la app (app/storage): una migración debe seguir funcionando
-aunque ese código cambie después.
+Subo las fotos existentes al bucket de imágenes (S3_IMAGES_BUCKET) y en la base dejo solo su URL
+pública. Si hay fotos y el almacenamiento no está configurado, detengo la migración en vez de
+perderlas. No uso las clases de la app (app/storage) para que la migración siga funcionando aunque
+ese código cambie.
 """
 import base64
 import binascii

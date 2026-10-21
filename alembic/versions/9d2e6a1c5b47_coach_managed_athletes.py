@@ -1,4 +1,4 @@
-"""Allow coach-managed athlete profiles without a user account.
+"""Permito perfiles de deportista gestionados por un entrenador, sin cuenta de usuario.
 
 Revision ID: 9d2e6a1c5b47
 Revises: 4c9b8e2f7d31

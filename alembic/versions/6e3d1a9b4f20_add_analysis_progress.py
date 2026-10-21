@@ -1,4 +1,4 @@
-"""Add persisted progress and retry bookkeeping to jump_analyses.
+"""Agrego a jump_analyses el progreso persistido y el registro de reintentos.
 
 Revision ID: 6e3d1a9b4f20
 Revises: 151f2ecce8b2

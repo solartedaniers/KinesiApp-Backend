@@ -1,4 +1,4 @@
-"""Add the processing lease and attempt id to jump_analyses.
+"""Agrego a jump_analyses el lease de procesamiento y el id del intento.
 
 Revision ID: b4e8f2a6c913
 Revises: 9a7c3e5d1b42

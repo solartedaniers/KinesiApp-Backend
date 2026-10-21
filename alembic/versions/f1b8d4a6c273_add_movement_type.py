@@ -1,4 +1,4 @@
-"""Add movement_type (jump/squat) to jump_analyses.
+"""Agrego movement_type (salto o sentadilla) a jump_analyses.
 
 Revision ID: f1b8d4a6c273
 Revises: e5a2c7b9d318

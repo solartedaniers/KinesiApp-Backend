@@ -1,4 +1,4 @@
-"""Add dominant risk pattern and model versions to jump_analyses.
+"""Agrego a jump_analyses el patrón de riesgo dominante y las versiones del modelo.
 
 Revision ID: a7c3e9f1d482
 Revises: f1b8d4a6c273

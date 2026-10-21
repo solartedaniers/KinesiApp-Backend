@@ -1,4 +1,4 @@
-"""Add the team logo (canonical URL in the private images bucket).
+"""Agrego el logo del equipo (URL canónica en el bucket privado de imágenes).
 
 Revision ID: a2d6f8c4e157
 Revises: b4e8f2a6c913

@@ -1,4 +1,4 @@
-"""Add video consent (timestamp + accepted text version) to users.
+"""Agrego a los usuarios el consentimiento de video (fecha y versión del texto aceptado).
 
 Revision ID: e5a2c7b9d318
 Revises: c3f8a1d6e924
