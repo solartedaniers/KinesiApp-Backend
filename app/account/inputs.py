@@ -4,7 +4,7 @@ from typing import Any
 from pydantic import BaseModel, ValidationInfo, field_validator
 
 from app.core.input_rules import InputModel, parse_input, rules_of
-from app.schemas.person_name import PersonName
+from app.identity.person_name import PersonName
 from app.storage.image_formats import ImageFormat
 
 

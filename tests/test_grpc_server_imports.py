@@ -2,8 +2,8 @@ import os
 import subprocess
 import sys
 
-# Dependencias que están en requirements.txt pero no en requirements-grpc.txt
-_ABSENT_IN_GRPC_IMAGE = ["fastapi", "starlette", "psycopg2", "kinesiapp_ai"]
+# Lo que no va en la imagen: el REST viejo, la IA como librería y lo que solo usan las migraciones
+_ABSENT_IN_GRPC_IMAGE = ["fastapi", "starlette", "kinesiapp_ai", "alembic", "psycopg2"]
 
 
 def test_grpc_server_imports_without_the_rest_only_dependencies() -> None:

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, ValidationInfo, field_validator
 from app.core.input_rules import InputModel, parse_input, rules_of
 from app.core.time_utils import age_on
 from app.models.athlete import Gender
-from app.schemas.person_name import PersonName
+from app.identity.person_name import PersonName
 from app.settings.athlete import AthleteSettings
 
 

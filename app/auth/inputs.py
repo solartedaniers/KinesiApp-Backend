@@ -6,7 +6,7 @@ from pydantic import BaseModel, EmailStr, Field, ValidationInfo, field_validator
 from app.core.input_rules import InputModel, parse_input, rules_of
 from app.identity.password_policy import PasswordPolicy
 from app.models.user import UserRole
-from app.schemas.person_name import PersonName
+from app.identity.person_name import PersonName
 
 
 @dataclass(frozen=True)

@@ -83,7 +83,7 @@ from app.rpc.managed_athlete_servicer import ManagedAthleteServicer
 from app.rpc.system_servicer import SystemServicer
 from app.rpc.team_servicer import TeamServicer
 from app.rpc.user_admin_servicer import UserAdminServicer
-from app.services.email_domain_checker import EmailDomainChecker
+from app.mail.email_domain_checker import EmailDomainChecker
 from app.settings.ai import AiClientSettings
 from app.settings.analysis import AnalysisSettings, ensure_lease_outlasts_ai_call
 from app.settings.athlete import AthleteSettings

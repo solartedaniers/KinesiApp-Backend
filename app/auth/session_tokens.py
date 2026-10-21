@@ -26,7 +26,7 @@ class _RefreshTokenClaims(BaseModel):
 
 
 class SessionTokenService:
-    """Firmo los JWT de sesión con el mismo formato del REST, para que ambos acepten los tokens del otro."""
+    """Firmo los JWT de sesión con el mismo formato que usaba el REST, para que las sesiones abiertas antes de la migración sigan sirviendo."""
 
     def __init__(self, settings: AuthSettings) -> None:
         self._secret = settings.JWT_SECRET_KEY.get_secret_value()
