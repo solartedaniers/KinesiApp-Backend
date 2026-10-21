@@ -33,12 +33,10 @@ FOREIGN_ORIGIN = "https://example.com"
 PRIVATE_IMAGES_BUCKET = "kinesiapp-dev-images"
 PRIVATE_VIDEOS_BUCKET = "kinesiapp-dev-videos"
 ALL_SECTIONS = ("account", "admin", "refresh", "athlete", "team", "ai", "analysis")
-# Varias preguntas seguidas: así el respaldo de Gemini y el reintento del backend tienen ocasión de actuar
+# Dos preguntas seguidas bastan para ver el respaldo y el historial; más gastaban la cuota diaria de Gemini
 DEFAULT_QUESTIONS = [
     "¿Qué debo corregir primero?",
     "¿Cómo está mi rodilla comparada con el rango objetivo?",
-    "¿Qué ejercicio me recomiendas para mejorar?",
-    "Resume en una frase cómo me fue.",
 ]
 ADMIN_SECTIONS = {"account", "admin", "refresh", "athlete", "team", "ai"}
 
