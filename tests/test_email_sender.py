@@ -6,7 +6,7 @@ import resend
 from pydantic import SecretStr
 from resend.exceptions import ResendError
 
-from app.core.config import settings
+from app.settings.mail import MailSettings
 from app.mail.email_sender import EmailDeliveryError, UnconfiguredEmailSender
 from app.mail.resend_email_sender import ResendEmailSender
 from app.services import email_domain_checker
@@ -43,15 +43,13 @@ def test_provider_and_network_errors_become_email_delivery_errors(monkeypatch):
         sender.send("ana@example.com", "Asunto", "Cuerpo")
 
 
-def test_factory_without_api_key_returns_a_sender_that_fails_explicitly(monkeypatch):
-    monkeypatch.setattr(settings, "RESEND_API_KEY", SecretStr(""))
-    sender = build_email_sender(settings)
+def test_factory_without_api_key_returns_a_sender_that_fails_explicitly():
+    sender = build_email_sender(MailSettings(_env_file=None, RESEND_API_KEY=SecretStr("")))
     assert isinstance(sender, UnconfiguredEmailSender)
     with pytest.raises(EmailDeliveryError, match="RESEND_API_KEY"):
         sender.send("ana@example.com", "Asunto", "Cuerpo")
 
-    monkeypatch.setattr(settings, "RESEND_API_KEY", SecretStr("re_test"))
-    assert isinstance(build_email_sender(settings), ResendEmailSender)
+    assert isinstance(build_email_sender(MailSettings(_env_file=None, RESEND_API_KEY=SecretStr("re_test"))), ResendEmailSender)
 
 
 class _FakeAnswer(list):
