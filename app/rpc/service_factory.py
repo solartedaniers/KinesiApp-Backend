@@ -36,6 +36,7 @@ from app.analysis.analysis_watch import AnalysisWatch
 from app.analysis.inputs import VideoUploadRules
 from app.analysis.progress_hub import AnalysisProgressHub
 from app.analysis.retry_policy import RetryPolicy
+from app.analysis.knee_reading import KneeReadingExtractor
 from app.analysis.risk_assessment_codec import RiskAssessmentCodec
 from app.analysis.risk_level import RiskLevelClassifier
 from app.analysis.video_playback import VideoPlayback
@@ -276,5 +277,5 @@ class RpcServiceFactory:
             AnalysisCatalog(self._uow_factory),
             AnalysisRemoval(self._uow_factory, self._videos, runner, hub),
             VideoPlayback(self._uow_factory, self._videos),
-            AnalysisMessages(self._risk_codec, self._risk_levels),
+            AnalysisMessages(self._risk_codec, self._risk_levels, KneeReadingExtractor()),
         )

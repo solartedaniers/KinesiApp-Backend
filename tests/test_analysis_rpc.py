@@ -26,6 +26,7 @@ from app.analysis.inputs import VideoUploadRules
 from app.analysis.progress import AnalysisProgressUpdate
 from app.analysis.progress_hub import AnalysisProgressHub
 from app.analysis.retry_policy import RetryPolicy
+from app.analysis.knee_reading import KneeReadingExtractor
 from app.analysis.risk_assessment_codec import RiskAssessmentCodec
 from app.analysis.risk_level import RiskLevelClassifier
 from app.analysis.video_playback import VideoPlayback
@@ -127,7 +128,7 @@ def _run(tmp_path: Path, scenario, script: list[str] | None = None):
             AnalysisCatalog(uows),
             AnalysisRemoval(uows, bucket, runner, hub),
             VideoPlayback(uows, bucket),
-            AnalysisMessages(codec, levels),
+            AnalysisMessages(codec, levels, KneeReadingExtractor()),
         )
         return partial(analysis_pb2_grpc.add_AnalysisServiceServicer_to_server, servicer)
 
@@ -252,6 +253,11 @@ def test_the_athlete_uploads_follows_reads_plays_and_deletes_an_analysis(tmp_pat
     assert lab.analyzer.calls[0].endswith("?signature=get")
     assert video.url.startswith(BUCKET_URL + "videos/") and video.url.endswith("?signature=get")
     assert [item.id for item in listed.analyses] == [summary.id] and listed.page.next_page_token == ""
+    # El resumen lleva la rodilla con los umbrales que guardó la IA; el de la subida, aún sin procesar, no
+    knee = listed.analyses[0]
+    assert knee.knee_median_peak_degrees == 109.5
+    assert (knee.knee_target.low_degrees, knee.knee_target.high_degrees) == (60.0, 80.0)
+    assert not summary.HasField("knee_median_peak_degrees") and not summary.HasField("knee_target")
     assert len(objects_before) == 1 and lab.bucket.objects == {}
     assert gone.code() is grpc.StatusCode.NOT_FOUND
 
