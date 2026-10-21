@@ -16,6 +16,7 @@ class UploadPurpose(str, enum.Enum):
     # Lo emito a nombre del deportista gestionado: así el ticket no sirve para la foto de otro deportista del coach
     MANAGED_ATHLETE_AVATAR = "managed_athlete_avatar"
     ANALYSIS_VIDEO = "analysis_video"
+    TEAM_LOGO = "team_logo"
 
 
 @dataclass(frozen=True)

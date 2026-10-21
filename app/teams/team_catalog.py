@@ -8,13 +8,15 @@ from app.identity.principal import Principal
 from app.models.team import Team
 from app.models.user import UserRole
 from app.repositories.unit_of_work import UnitOfWork
+from app.storage.avatar_files import AvatarFiles
 
 
 class TeamCatalog:
     """Creo, muestro, renombro y borro equipos: el coach maneja los suyos y el admin los de cualquiera."""
 
-    def __init__(self, uow_factory: Callable[[], UnitOfWork]) -> None:
+    def __init__(self, uow_factory: Callable[[], UnitOfWork], logo_files: AvatarFiles) -> None:
         self._uow_factory = uow_factory
+        self._logo_files = logo_files
 
     async def list(self, principal: Principal) -> list[Team]:
         async with self._uow_factory() as uow:
@@ -47,8 +49,12 @@ class TeamCatalog:
 
     async def delete(self, principal: Principal, team_id: int) -> None:
         async with self._uow_factory() as uow:
-            await uow.teams.delete(await visible_team(uow, principal, team_id))
+            team = await visible_team(uow, principal, team_id)
+            logo_url = team.logo_url
+            await uow.teams.delete(team)
             await uow.commit()
+        # Borro el archivo después del commit: si el borrado del equipo fallara, el logo seguiría en uso
+        await self._logo_files.discard(logo_url)
 
 
 async def visible_team(uow: UnitOfWork, principal: Principal, team_id: int) -> Team:

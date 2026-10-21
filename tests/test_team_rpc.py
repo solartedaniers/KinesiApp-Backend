@@ -7,21 +7,40 @@ from pathlib import Path
 
 import grpc
 import pytest
+from kinesiapp.common.v1 import storage_pb2
 from kinesiapp.team.v1 import team_pb2, team_pb2_grpc
 
+from app.account.inputs import AccountInputRules
 from app.models.athlete import AthleteProfile, Gender
 from app.models.user import UserRole
 from app.rpc.team_servicer import TeamServicer
+from app.storage.avatar_files import AvatarFiles
+from app.storage.avatar_links import AvatarLinks
+from app.storage.upload_tickets import UploadTicketService
 from app.teams.team_catalog import TeamCatalog
+from app.teams.team_logos import TeamLogos
 from app.teams.team_membership import TeamMembership
 from tests.grpc_harness import error_info, field_violations
-from tests.rpc_world import World, bearer, rpc_world, uow_factory
+from tests.rpc_world import AUTH_SETTINGS, FakeBucket, World, bearer, rpc_world, uow_factory
+
+MAX_LOGO_BYTES = 64
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 24
 
 
-def _run(tmp_path: Path, scenario):
+def _run(tmp_path: Path, scenario, images: FakeBucket | None = None):
+    images = images or FakeBucket()
+
     def register(session_factory):
         uows = uow_factory(session_factory)
-        return partial(team_pb2_grpc.add_TeamServiceServicer_to_server, TeamServicer(TeamCatalog(uows), TeamMembership(uows)))
+        files = AvatarFiles(images, UploadTicketService(AUTH_SETTINGS, 60), MAX_LOGO_BYTES)
+        servicer = TeamServicer(
+            TeamCatalog(uows, files),
+            TeamMembership(uows),
+            TeamLogos(uows, files),
+            AccountInputRules(MAX_LOGO_BYTES),
+            AvatarLinks(images),
+        )
+        return partial(team_pb2_grpc.add_TeamServiceServicer_to_server, servicer)
 
     async def main():
         async with rpc_world(tmp_path / "teams.db", register) as world:
@@ -162,3 +181,74 @@ def test_simultaneous_creations_with_the_same_name_leave_a_single_team(tmp_path:
         "ok",
     ]
     assert teams == 1
+
+
+def _logo_upload(team_id: int, content_length: int = len(PNG)) -> team_pb2.CreateTeamLogoUploadRequest:
+    return team_pb2.CreateTeamLogoUploadRequest(
+        team_id=team_id, content_type=storage_pb2.IMAGE_CONTENT_TYPE_PNG, content_length=content_length
+    )
+
+
+def test_team_logo_goes_directly_to_the_bucket_and_replaces_the_previous_one(tmp_path: Path) -> None:
+    images = FakeBucket()
+
+    async def scenario(world: World, stub):
+        coach = await world.user("coach@kinesiapp.com", UserRole.COACH)
+        team = (await stub.CreateTeam(team_pb2.CreateTeamRequest(name="Sub 17"), metadata=bearer(coach))).team
+        other = (await stub.CreateTeam(team_pb2.CreateTeamRequest(name="Arqueros"), metadata=bearer(coach))).team
+        keys = []
+        for _ in range(2):
+            upload = await stub.CreateTeamLogoUpload(_logo_upload(team.id), metadata=bearer(coach))
+            keys.append(images.signed_uploads[-1][0])
+            images.browser_put(keys[-1], PNG, "image/png")
+            # Compruebo que el ticket de un equipo no sirve para el logo de otro del mismo coach
+            swapped = await _error_of(
+                stub.ConfirmTeamLogoUpload(
+                    team_pb2.ConfirmTeamLogoUploadRequest(team_id=other.id, upload_id=upload.upload_id), metadata=bearer(coach)
+                )
+            )
+            confirmed = await stub.ConfirmTeamLogoUpload(
+                team_pb2.ConfirmTeamLogoUploadRequest(team_id=team.id, upload_id=upload.upload_id), metadata=bearer(coach)
+            )
+        replaced = set(images.objects)
+        listed = await stub.ListTeams(team_pb2.ListTeamsRequest(), metadata=bearer(coach))
+        removed = await stub.DeleteTeamLogo(team_pb2.DeleteTeamLogoRequest(team_id=team.id), metadata=bearer(coach))
+        again = await stub.DeleteTeamLogo(team_pb2.DeleteTeamLogoRequest(team_id=team.id), metadata=bearer(coach))
+        return keys, swapped, confirmed.team, replaced, listed.teams, removed.team, again.team, dict(images.objects)
+
+    keys, swapped, confirmed, replaced, listed, removed, again, after = _run(tmp_path, scenario, images)
+
+    assert error_info(swapped).reason == "UPLOAD_NOT_FOUND"
+    assert confirmed.logo.url.startswith(f"https://bucket.test/images/{keys[1]}?signature=get")
+    assert replaced == {keys[1]}
+    assert [team.HasField("logo") for team in listed] == [False, True]
+    assert not removed.HasField("logo") and not again.HasField("logo") and after == {}
+
+
+def test_only_who_sees_the_team_can_change_its_logo_and_deleting_the_team_removes_it(tmp_path: Path) -> None:
+    images = FakeBucket()
+
+    async def scenario(world: World, stub):
+        coach = await world.user("coach@kinesiapp.com", UserRole.COACH)
+        intruder = await world.user("intruso@kinesiapp.com", UserRole.COACH)
+        admin = await world.user("admin@kinesiapp.com", UserRole.ADMIN)
+        team = (await stub.CreateTeam(team_pb2.CreateTeamRequest(name="Sub 17"), metadata=bearer(coach))).team
+        foreign = await _error_of(stub.CreateTeamLogoUpload(_logo_upload(team.id), metadata=bearer(intruder)))
+        too_big = await _error_of(stub.CreateTeamLogoUpload(_logo_upload(team.id, MAX_LOGO_BYTES + 1), metadata=bearer(coach)))
+        signed_before = len(images.signed_uploads)
+        # El admin administra los equipos de cualquiera, también su logo
+        upload = await stub.CreateTeamLogoUpload(_logo_upload(team.id), metadata=bearer(admin))
+        images.browser_put(images.signed_uploads[-1][0], PNG, "image/png")
+        await stub.ConfirmTeamLogoUpload(
+            team_pb2.ConfirmTeamLogoUploadRequest(team_id=team.id, upload_id=upload.upload_id), metadata=bearer(admin)
+        )
+        with_logo = dict(images.objects)
+        await stub.DeleteTeam(team_pb2.DeleteTeamRequest(team_id=team.id), metadata=bearer(coach))
+        return foreign, too_big, signed_before, with_logo, dict(images.objects)
+
+    foreign, too_big, signed_before, with_logo, after = _run(tmp_path, scenario, images)
+
+    assert foreign.code() == grpc.StatusCode.NOT_FOUND
+    assert field_violations(too_big) == ["content_length"]
+    assert signed_before == 0
+    assert len(with_logo) == 1 and after == {}

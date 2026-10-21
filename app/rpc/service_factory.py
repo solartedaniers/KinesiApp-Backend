@@ -98,6 +98,7 @@ from app.storage.avatar_links import AvatarLinks
 from app.storage.signed_storage_factory import build_signed_storage
 from app.storage.upload_tickets import UploadTicketService
 from app.teams.team_catalog import TeamCatalog
+from app.teams.team_logos import TeamLogos
 from app.teams.team_membership import TeamMembership
 
 ServicerRegistration = Callable[[grpc.aio.Server], None]
@@ -239,7 +240,13 @@ class RpcServiceFactory:
         )
 
     def _teams(self) -> TeamServicer:
-        return TeamServicer(TeamCatalog(self._uow_factory), TeamMembership(self._uow_factory))
+        return TeamServicer(
+            TeamCatalog(self._uow_factory, self._avatar_files),
+            TeamMembership(self._uow_factory),
+            TeamLogos(self._uow_factory, self._avatar_files),
+            AccountInputRules(self._media_settings.MAX_AVATAR_UPLOAD_BYTES),
+            self._avatar_links,
+        )
 
     def _chat(self) -> ChatServicer:
         chat = self._chat_settings
