@@ -16,7 +16,7 @@ Next.js (Vercel fra1) ──gRPC-Web, HTTP/1.1──▶ Envoy :$PORT ──gRPC 
                                              Neon Storage (S3, buckets privados)
 ```
 
-- **Contract-first.** Traigo los contratos como submódulo en `contracts/`, fijado a un tag (hoy `v0.9.0`). `scripts/generate_grpc.py` genera el código Python en `generated/`, que no se versiona. Nunca implemento un RPC que no esté en el contrato.
+- **Contract-first.** Traigo los contratos como submódulo en `contracts/`, fijado a un tag (hoy `v0.10.0`). `scripts/generate_grpc.py` genera el código Python en `generated/`, que no se versiona. Nunca implemento un RPC que no esté en el contrato.
 - **Envoy delante de grpcio.** Render solo acepta HTTP/1.1 desde internet, así que en el mismo contenedor Envoy recibe gRPC-Web en `$PORT`, lo traduce a gRPC nativo hacia `grpcio` en localhost y responde `/healthz`. Solo reenvía rutas `/kinesiapp.*` (`deploy/grpc/`).
 - **Servicios** (`app/rpc/*_servicer.py`): `SystemService`, `AuthService`, `AccountService`, `UserAdminService`, `AthleteProfileService`, `ManagedAthleteService`, `TeamService`, `AnalysisService` y `ChatService`. `AccountService` es lo que la persona hace sobre su propia cuenta, y `UserAdminService` lo que hace un admin sobre las demás. Por eso son servicios distintos.
 - **Interceptores.** Toda llamada pasa por tres:
