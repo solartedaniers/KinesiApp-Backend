@@ -33,6 +33,13 @@ FOREIGN_ORIGIN = "https://example.com"
 PRIVATE_IMAGES_BUCKET = "kinesiapp-dev-images"
 PRIVATE_VIDEOS_BUCKET = "kinesiapp-dev-videos"
 ALL_SECTIONS = ("account", "admin", "refresh", "athlete", "team", "ai", "analysis")
+# Varias preguntas seguidas: así el respaldo de Gemini y el reintento del backend tienen ocasión de actuar
+DEFAULT_QUESTIONS = [
+    "¿Qué debo corregir primero?",
+    "¿Cómo está mi rodilla comparada con el rango objetivo?",
+    "¿Qué ejercicio me recomiendas para mejorar?",
+    "Resume en una frase cómo me fue.",
+]
 ADMIN_SECTIONS = {"account", "admin", "refresh", "athlete", "team", "ai"}
 
 
@@ -450,6 +457,8 @@ def analysis_section(
     origins: list[str],
     keep_on_failure: bool,
     upload_min_kbps: int,
+    movement: str,
+    questions: list[str],
 ) -> None:
     service = "kinesiapp.analysis.v1.AnalysisService"
     failures_before = report.failures()
@@ -471,7 +480,7 @@ def analysis_section(
     if not report.check("Athlete has an athlete profile", error is None, error):
         return
     content = video.read_bytes()
-    request = {"athleteId": profile["athlete"]["id"], "movementType": "MOVEMENT_TYPE_SQUAT", "contentType": "video/mp4",
+    request = {"athleteId": profile["athlete"]["id"], "movementType": f"MOVEMENT_TYPE_{movement.upper()}", "contentType": "video/mp4",
                "contentLength": len(content), "durationMs": duration_ms}
     upload, error = timed("CreateVideoUpload", lambda: rpc.call(f"{service}/CreateVideoUpload", request, token))
     if not report.check("CreateVideoUpload", error is None, error):
@@ -523,16 +532,25 @@ def analysis_section(
             timings.append(("StartConversation first delta", opening[0][0]))
             timings.append(("StartConversation total", opening[-1][0]))
         report.check("StartConversation streams the explanation", error is None and deltas and "assistantMessage" in opening[-1][1], error or f"{len(deltas)} deltas")
-        answer, error = rpc.stream(
-            "kinesiapp.chat.v1.ChatService/SendMessage", {"analysisId": analysis_id, "content": "¿Qué debo corregir primero?"}, token
-        )
-        if answer:
-            timings.append(("SendMessage first event", answer[0][0]))
-            timings.append(("SendMessage total", answer[-1][0]))
+        for number, question in enumerate(questions, start=1):
+            answer, error = rpc.stream(
+                "kinesiapp.chat.v1.ChatService/SendMessage", {"analysisId": analysis_id, "content": question}, token
+            )
+            if answer:
+                timings.append((f"SendMessage {number} first event", answer[0][0]))
+                timings.append((f"SendMessage {number} total", answer[-1][0]))
+            report.check(
+                f"SendMessage {number} streams the question and the answer",
+                error is None and answer and "userMessage" in answer[0][1] and "assistantMessage" in answer[-1][1],
+                error or f"{len(answer)} events",
+            )
+        history, error = rpc.call("kinesiapp.chat.v1.ChatService/ListMessages", {"analysisId": analysis_id}, token)
+        asked = [m["content"] for m in (history or {}).get("messages", []) if m.get("role") == "CHAT_ROLE_USER"]
+        answered = [m for m in (history or {}).get("messages", []) if m.get("role") == "CHAT_ROLE_ASSISTANT"]
         report.check(
-            "SendMessage streams the question and the answer",
-            error is None and answer and "userMessage" in answer[0][1] and "assistantMessage" in answer[-1][1],
-            error or f"{len(answer)} events",
+            "Each question is saved once and answered",
+            error is None and asked == questions and len(answered) == len(questions) + 1,
+            error or f"{len(asked)} questions, {len(answered)} assistant messages",
         )
     finally:
         if keep_on_failure and report.failures() > failures_before:
@@ -563,6 +581,8 @@ def main() -> int:
     parser.add_argument("--only", default=",".join(ALL_SECTIONS))
     parser.add_argument("--video", type=Path)
     parser.add_argument("--video-duration-ms", type=int)
+    parser.add_argument("--movement", choices=("jump", "squat"), default="squat", help="movement recorded in --video")
+    parser.add_argument("--question", dest="questions", action="append", help="chat question; repeat it to ask several")
     parser.add_argument("--keep-on-failure", action="store_true")
     parser.add_argument("--upload-min-kbps", type=int, default=1000, help="slowest upload speed to wait for, in kbit/s")
     args = parser.parse_args()
@@ -598,7 +618,8 @@ def main() -> int:
     if "ai" in sections:
         ai_section(rpc, report, admin)
     if "analysis" in sections:
-        analysis_section(rpc, report, athlete, args.video, args.video_duration_ms, args.origins, args.keep_on_failure, args.upload_min_kbps)
+        analysis_section(rpc, report, athlete, args.video, args.video_duration_ms, args.origins, args.keep_on_failure, args.upload_min_kbps,
+                         args.movement, args.questions or DEFAULT_QUESTIONS)
     if "refresh" in sections:
         refresh_section(rpc, report, admin)
     return report.summary()
