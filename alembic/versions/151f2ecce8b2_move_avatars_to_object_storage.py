@@ -38,7 +38,9 @@ def _upload_existing_avatars(connection) -> None:
     if not any(rows.values()):
         return
 
-    from app.core.config import settings
+    from app.settings.storage import StorageSettings
+
+    settings = StorageSettings()
 
     secret = settings.AWS_SECRET_ACCESS_KEY.get_secret_value() if settings.AWS_SECRET_ACCESS_KEY else ""
     if not (settings.AWS_ENDPOINT_URL_S3 and settings.AWS_REGION and settings.AWS_ACCESS_KEY_ID and secret):
