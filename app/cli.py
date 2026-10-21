@@ -4,67 +4,69 @@ Credentials come from ADMIN_EMAIL / ADMIN_PASSWORD / ADMIN_FULL_NAME env vars,
 or are prompted interactively (password via getpass, never echoed or logged).
 """
 import argparse
+import asyncio
 import getpass
 import os
+from functools import partial
 
+from pydantic import ValidationError
 from sqlalchemy import inspect
+from sqlalchemy.ext.asyncio import AsyncEngine
 
-from app.core.database import SessionLocal, engine
+from app.admin.admin_bootstrap import AdminBootstrap
+from app.admin.inputs import AccountInput, AdminInputRules
+from app.auth.password_hasher import PasswordHasher
+from app.core.async_database import build_async_engine, build_session_factory
+from app.identity.password_policy import PasswordPolicy
 from app.models.user import User
-from app.repositories.user_repository import UserRepository
-from app.schemas.user import UserCreate
-from app.services.user_service import UserService
+from app.repositories.unit_of_work import UnitOfWork
+from app.settings.auth import PasswordPolicySettings
+from app.settings.database import DatabaseSettings
 
 
-def _read_credentials() -> tuple[str, str, str]:
-    email = os.getenv("ADMIN_EMAIL") or input("Admin email: ").strip()
-    password = os.getenv("ADMIN_PASSWORD") or getpass.getpass("Admin password: ")
-    full_name = os.getenv("ADMIN_FULL_NAME") or input("Admin full name: ").strip()
-    return email, password, full_name
+def _read_credentials() -> dict[str, str]:
+    return {
+        "email": os.getenv("ADMIN_EMAIL") or input("Admin email: ").strip(),
+        "password": os.getenv("ADMIN_PASSWORD") or getpass.getpass("Admin password: "),
+        "full_name": os.getenv("ADMIN_FULL_NAME") or input("Admin full name: ").strip(),
+    }
 
 
-def _ensure_schema_migrated() -> None:
-    # La CLI no crea tablas: si el esquema no está migrado, falla con un
-    # mensaje claro en vez de crearlo por su cuenta (eso es trabajo de Alembic).
-    if not inspect(engine).has_table(User.__tablename__):
-        raise SystemExit(
-            "El esquema de la base de datos no está migrado "
-            f"(falta la tabla '{User.__tablename__}'). Corré 'alembic upgrade head' primero."
-        )
+async def _ensure_schema_migrated(engine: AsyncEngine) -> None:
+    # La CLI no crea tablas: si el esquema no está migrado, fallo con un mensaje claro (eso es trabajo de Alembic)
+    async with engine.connect() as connection:
+        migrated = await connection.run_sync(lambda sync: inspect(sync).has_table(User.__tablename__))
+    if not migrated:
+        raise SystemExit(f"The database schema is not migrated (table '{User.__tablename__}' is missing). Run 'alembic upgrade head' first.")
 
 
-def create_admin() -> None:
-    email, password, full_name = _read_credentials()
-
-    _ensure_schema_migrated()
-    db = SessionLocal()
+async def create_admin(engine: AsyncEngine) -> None:
+    rules = AdminInputRules(PasswordPolicy(PasswordPolicySettings()))
     try:
-        repository = UserRepository(db)
-        service = UserService(repository)
+        data = rules.parse(AccountInput, _read_credentials())
+    except ValidationError as error:
+        raise SystemExit(str(error)) from None
 
-        user = repository.get_by_email(email)
-        if user is None:
-            user = service.create_user(UserCreate(email=email, password=password, full_name=full_name))
+    await _ensure_schema_migrated(engine)
+    bootstrap = AdminBootstrap(partial(UnitOfWork, build_session_factory(engine)), PasswordHasher())
+    user = await bootstrap.run(data)
+    print(f"'{user.email}' is now ADMIN.")
 
-        # Idempotente: si ya existía, sólo lo promueve; no toca su contraseña
-        user = service.promote_to_admin(user.id)
-        if not user.is_verified:
-            user.is_verified = True
-            repository.add(user)
 
-        print(f"'{email}' is now ADMIN.")
+async def _main(command: str) -> None:
+    engine = build_async_engine(DatabaseSettings())
+    try:
+        if command == "create-admin":
+            await create_admin(engine)
     finally:
-        db.close()
+        await engine.dispose()
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="python -m app.cli")
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("create-admin", help="Create a user as ADMIN, or promote it if it already exists")
-
-    args = parser.parse_args()
-    if args.command == "create-admin":
-        create_admin()
+    asyncio.run(_main(parser.parse_args().command))
 
 
 if __name__ == "__main__":

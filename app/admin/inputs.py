@@ -17,17 +17,20 @@ class AdminInputRules:
         return parse_input(model, data, self)
 
 
-class NewUserInput(BaseModel):
+class AccountInput(BaseModel):
     email: EmailStr
     password: str
     full_name: PersonName
-    # Como en el registro público, aquí no admito ADMIN: ese rol solo se asigna después, cambiando el rol
-    role: Literal[UserRole.ATHLETE, UserRole.COACH]
 
     @field_validator("password")
     @classmethod
     def _strong_password(cls, value: str, info: ValidationInfo) -> str:
         return rules_of(info, AdminInputRules).password_policy.ensure_valid(value)
+
+
+class NewUserInput(AccountInput):
+    # Como en el registro público, aquí no admito ADMIN: ese rol solo se asigna después, cambiando el rol
+    role: Literal[UserRole.ATHLETE, UserRole.COACH]
 
 
 class UserIdInput(BaseModel):
