@@ -15,10 +15,21 @@ from app.settings.athlete import AthleteSettings
 class AthleteInputRules:
     min_age_years: int
     max_age_years: int
+    min_height_cm: float
+    max_height_cm: float
+    min_weight_kg: float
+    max_weight_kg: float
 
     @classmethod
     def from_settings(cls, settings: AthleteSettings) -> "AthleteInputRules":
-        return cls(settings.ATHLETE_MIN_AGE_YEARS, settings.ATHLETE_MAX_AGE_YEARS)
+        return cls(
+            settings.ATHLETE_MIN_AGE_YEARS,
+            settings.ATHLETE_MAX_AGE_YEARS,
+            settings.ATHLETE_MIN_HEIGHT_CM,
+            settings.ATHLETE_MAX_HEIGHT_CM,
+            settings.ATHLETE_MIN_WEIGHT_KG,
+            settings.ATHLETE_MAX_WEIGHT_KG,
+        )
 
     def parse(self, model: type[InputModel], data: dict[str, Any]) -> InputModel:
         return parse_input(model, data, self)
@@ -36,22 +47,36 @@ def _plausible_birth_date(value: date | None, info: ValidationInfo) -> date | No
     return value
 
 
+def _realistic_measure(value: float | None, info: ValidationInfo) -> float | None:
+    if value is None:
+        return None
+    rules = rules_of(info, AthleteInputRules)
+    low, high = (
+        (rules.min_height_cm, rules.max_height_cm) if info.field_name == "height_cm" else (rules.min_weight_kg, rules.max_weight_kg)
+    )
+    if not low <= value <= high:
+        raise ValueError(f"{info.field_name} must be between {low:g} and {high:g}")
+    return value
+
+
 class BiometricsInput(BaseModel):
     gender: Gender
-    height_cm: float = Field(gt=0, le=300)
-    weight_kg: float = Field(gt=0, le=400)
+    height_cm: float
+    weight_kg: float
     birth_date: date
 
     _birth_date = field_validator("birth_date")(_plausible_birth_date)
+    _measures = field_validator("height_cm", "weight_kg")(_realistic_measure)
 
 
 class BiometricsUpdateInput(BaseModel):
     gender: Gender | None = None
-    height_cm: float | None = Field(default=None, gt=0, le=300)
-    weight_kg: float | None = Field(default=None, gt=0, le=400)
+    height_cm: float | None = None
+    weight_kg: float | None = None
     birth_date: date | None = None
 
     _birth_date = field_validator("birth_date")(_plausible_birth_date)
+    _measures = field_validator("height_cm", "weight_kg")(_realistic_measure)
 
     def changes(self) -> dict[str, Any]:
         # Solo aplico lo que llegó: un campo ausente no borra una columna obligatoria

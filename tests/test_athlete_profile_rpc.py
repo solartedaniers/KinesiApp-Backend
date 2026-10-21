@@ -20,13 +20,14 @@ from app.core.pagination import PageRules
 from app.models.athlete import AthleteProfile, Gender
 from app.models.team import Team
 from app.models.user import UserRole
+from app.settings.athlete import AthleteSettings
 from app.rpc.athlete_messages import AthleteMessages
 from app.rpc.athlete_profile_servicer import AthleteProfileServicer
 from app.storage.avatar_links import AvatarLinks
 from tests.grpc_harness import error_info, field_violations
 from tests.rpc_world import FakeBucket, World, bearer, rpc_world, uow_factory
 
-RULES = AthleteInputRules(min_age_years=5, max_age_years=100)
+RULES = AthleteInputRules.from_settings(AthleteSettings(_env_file=None))
 
 
 def _run(tmp_path: Path, scenario):
@@ -129,6 +130,38 @@ def test_invalid_biometrics_report_every_field(tmp_path: Path) -> None:
     assert invalid.code() == grpc.StatusCode.INVALID_ARGUMENT
     assert sorted(field_violations(invalid)) == ["birth_date", "gender", "height_cm", "weight_kg"]
     assert field_violations(impossible_day) == ["birth_date"]
+
+
+def test_height_in_meters_or_weight_in_pounds_are_rejected(tmp_path: Path) -> None:
+    async def scenario(world: World, stub):
+        ana = await world.user("ana@kinesiapp.com")
+        meters = await _error_of(
+            stub.CreateMyAthleteProfile(
+                profiles_pb2.CreateMyAthleteProfileRequest(biometrics=_biometrics(height_cm=1.75)), metadata=bearer(ana)
+            )
+        )
+        await stub.CreateMyAthleteProfile(profiles_pb2.CreateMyAthleteProfileRequest(biometrics=_biometrics()), metadata=bearer(ana))
+        pounds = await _error_of(
+            stub.UpdateMyAthleteProfile(
+                profiles_pb2.UpdateMyAthleteProfileRequest(biometrics=athlete_pb2.BiometricsUpdate(weight_kg=300)),
+                metadata=bearer(ana),
+            )
+        )
+        edges = await stub.UpdateMyAthleteProfile(
+            profiles_pb2.UpdateMyAthleteProfileRequest(
+                biometrics=athlete_pb2.BiometricsUpdate(height_cm=RULES.min_height_cm, weight_kg=RULES.max_weight_kg)
+            ),
+            metadata=bearer(ana),
+        )
+        return meters, pounds, edges
+
+    meters, pounds, edges = _run(tmp_path, scenario)
+
+    assert meters.code() == grpc.StatusCode.INVALID_ARGUMENT
+    assert field_violations(meters) == ["height_cm"]
+    assert field_violations(pounds) == ["weight_kg"]
+    # Los extremos del rango son válidos
+    assert (edges.athlete.biometrics.height_cm, edges.athlete.biometrics.weight_kg) == (RULES.min_height_cm, RULES.max_weight_kg)
 
 
 def test_only_athletes_have_their_own_profile(tmp_path: Path) -> None:

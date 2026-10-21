@@ -24,6 +24,7 @@ from app.rpc.managed_athlete_servicer import ManagedAthleteServicer
 from app.storage.avatar_files import AvatarFiles
 from app.storage.avatar_links import AvatarLinks
 from app.storage.upload_tickets import UploadTicketService
+from app.settings.athlete import AthleteSettings
 from tests.grpc_harness import error_info, field_violations
 from tests.rpc_world import AUTH_SETTINGS, FakeBucket, World, bearer, rpc_world, uow_factory
 
@@ -39,7 +40,7 @@ def _run(tmp_path: Path, scenario, images: FakeBucket | None = None, videos: Fak
         uows = uow_factory(session_factory)
         files = AvatarFiles(images, UploadTicketService(AUTH_SETTINGS, 60), MAX_AVATAR_BYTES)
         servicer = ManagedAthleteServicer(
-            AthleteInputRules(min_age_years=5, max_age_years=100),
+            AthleteInputRules.from_settings(AthleteSettings(_env_file=None)),
             AccountInputRules(MAX_AVATAR_BYTES),
             ManagedAthletes(uows, files, videos),
             ManagedAthleteAvatars(uows, files),

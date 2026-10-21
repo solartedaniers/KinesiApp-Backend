@@ -27,4 +27,10 @@ def build_client_policy(
         athlete_min_age_years=athletes.ATHLETE_MIN_AGE_YEARS,
         athlete_max_age_years=athletes.ATHLETE_MAX_AGE_YEARS,
         chat_message_max_chars=chat.CHAT_MESSAGE_MAX_CHARS,
+        biometrics=system_pb2.BiometricsPolicy(
+            min_height_cm=athletes.ATHLETE_MIN_HEIGHT_CM,
+            max_height_cm=athletes.ATHLETE_MAX_HEIGHT_CM,
+            min_weight_kg=athletes.ATHLETE_MIN_WEIGHT_KG,
+            max_weight_kg=athletes.ATHLETE_MAX_WEIGHT_KG,
+        ),
     )

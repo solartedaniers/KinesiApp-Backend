@@ -69,6 +69,13 @@ def test_client_policy_comes_from_configuration() -> None:
     ]
     assert (policy.athlete_min_age_years, policy.athlete_max_age_years) == (5, 100)
     assert policy.chat_message_max_chars == 500
+    biometrics = policy.biometrics
+    assert (biometrics.min_height_cm, biometrics.max_height_cm, biometrics.min_weight_kg, biometrics.max_weight_kg) == (80, 250, 15, 250)
+
+
+def test_athlete_ranges_must_be_ordered() -> None:
+    with pytest.raises(ValueError, match="must be lower"):
+        AthleteSettings(_env_file=None, ATHLETE_MIN_HEIGHT_CM=200, ATHLETE_MAX_HEIGHT_CM=150)
 
 
 def test_wake_up_ai_is_unavailable_until_the_ai_service_exists() -> None:
