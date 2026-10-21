@@ -67,8 +67,9 @@ def _result() -> movement_analysis_pb2.MovementAnalysisResult:
 class _FakeAnalyzer:
     """Simulo la IA en memoria: cada llamada sigue el guion que le toca; "ok" espera a que la prueba suelte la compuerta."""
 
-    def __init__(self, script: list[str]) -> None:
+    def __init__(self, script: list[str], result: movement_analysis_pb2.MovementAnalysisResult | None = None) -> None:
         self.script = script
+        self.result = result or _result()
         self.calls: list[str] = []
         self.gate = asyncio.Event()
         self.gate.set()
@@ -85,7 +86,7 @@ class _FakeAnalyzer:
         self.started.set()
         await self.gate.wait()
         yield AnalysisProgressUpdate(AnalysisStage.SCORING_RISK)
-        yield _result()
+        yield self.result
 
 
 @dataclass
@@ -99,9 +100,9 @@ class _Lab:
     delays: list[float] = field(default_factory=list)
 
 
-def _run(tmp_path: Path, scenario, script: list[str] | None = None):
+def _run(tmp_path: Path, scenario, script: list[str] | None = None, result=None):
     bucket = FakeBucket()
-    analyzer = _FakeAnalyzer(script or ["ok"])
+    analyzer = _FakeAnalyzer(script or ["ok"], result)
     parts: dict = {}
 
     def register(session_factory):
@@ -515,3 +516,72 @@ def test_coached_listing_filters_by_one_of_the_coach_teams(tmp_path: Path) -> No
     assert [a.id for a in filtered.analyses] == [2] and filtered.page.next_page_token == ""
     assert error_info(foreign).reason == "NOT_FOUND"
     assert invalid.code() is grpc.StatusCode.INVALID_ARGUMENT
+
+
+def _frontal_result() -> movement_analysis_pb2.MovementAnalysisResult:
+    left = movement_pb2.RiskSignal(
+        code="knee_valgus_left", joint=movement_pb2.JOINT_ANGLE_KNEE_VALGUS, side=movement_pb2.BODY_SIDE_LEFT,
+        direction=movement_pb2.RISK_DIRECTION_HIGHER_IS_RISKIER, onset_degrees=10.0, saturation_degrees=25.0,
+        measured=movement_pb2.AngleSummary(median_degrees=21.0, min_degrees=21.0, max_degrees=21.0), score_median=0.733,
+    )
+    return movement_analysis_pb2.MovementAnalysisResult(
+        angle_samples=[
+            movement_pb2.JointAngleSample(
+                joint=movement_pb2.JOINT_ANGLE_KNEE_VALGUS, side=movement_pb2.BODY_SIDE_LEFT, angle_degrees=21.0, frame_timestamp_ms=1633
+            ),
+            movement_pb2.JointAngleSample(
+                joint=movement_pb2.JOINT_ANGLE_KNEE_VALGUS, side=movement_pb2.BODY_SIDE_RIGHT, angle_degrees=-3.0, frame_timestamp_ms=1633
+            ),
+        ],
+        risk_assessment=movement_pb2.RiskAssessment(
+            risk_score=0.733,
+            dominant_pattern="knee_valgus_left",
+            camera_view=movement_pb2.CAMERA_VIEW_FRONT,
+            patterns=[movement_pb2.RiskPattern(code="knee_valgus_left", score=0.733, repetitions_triggered=1, signals=[left])],
+            repetitions=[
+                movement_pb2.Repetition(
+                    start_ms=1500, end_ms=1800, detected_by=movement_pb2.DETECTION_METHOD_LANDING,
+                    pattern_scores=[movement_pb2.RepetitionScore(code="knee_valgus_left", score=0.733)],
+                    signal_scores=[
+                        movement_pb2.RepetitionScore(
+                            code="knee_valgus_left", score=0.733, measured_degrees=21.0, side=movement_pb2.BODY_SIDE_LEFT, peak_ms=1633
+                        )
+                    ],
+                    keyframes=[
+                        movement_pb2.PoseKeyframe(
+                            timestamp_ms=1633,
+                            keypoints=[movement_pb2.Keypoint(landmark=movement_pb2.BODY_LANDMARK_LEFT_KNEE, x=0.52, y=0.71)],
+                        )
+                    ],
+                )
+            ],
+        ),
+        pose_model_version="pose-v1",
+        risk_model_version="risk-v1",
+    )
+
+
+def test_a_frontal_analysis_keeps_its_view_each_leg_and_the_pose_at_the_peak(tmp_path: Path) -> None:
+    async def scenario(lab: _Lab):
+        people = await _people(lab.world)
+        summary = await _confirm(lab, people.athlete, await _upload(lab, people.athlete, people.profile_id))
+        await _watch(lab, people.athlete, summary.id)
+        reply = await lab.stub.GetAnalysis(analysis_pb2.GetAnalysisRequest(analysis_id=summary.id), metadata=bearer(people.coach))
+        return reply.analysis
+
+    detail = _run(tmp_path, scenario, result=_frontal_result())
+
+    assessment = detail.risk_assessment
+    assert assessment.camera_view == movement_pb2.CAMERA_VIEW_FRONT
+    assert detail.summary.dominant_risk_pattern == "knee_valgus_left"
+    assert [(s.joint, s.side, s.angle_degrees) for s in detail.angle_samples] == [
+        (movement_pb2.JOINT_ANGLE_KNEE_VALGUS, movement_pb2.BODY_SIDE_LEFT, 21.0),
+        (movement_pb2.JOINT_ANGLE_KNEE_VALGUS, movement_pb2.BODY_SIDE_RIGHT, -3.0),
+    ]
+    assert assessment.patterns[0].signals[0].side == movement_pb2.BODY_SIDE_LEFT
+    score = assessment.repetitions[0].signal_scores[0]
+    assert (score.side, score.peak_ms) == (movement_pb2.BODY_SIDE_LEFT, 1633)
+    keypoint = assessment.repetitions[0].keyframes[0].keypoints[0]
+    assert (keypoint.landmark, keypoint.x, keypoint.y) == (movement_pb2.BODY_LANDMARK_LEFT_KNEE, 0.52, 0.71)
+    # Sin flexión medida, el resumen no inventa una lectura de rodilla
+    assert not detail.summary.HasField("knee_median_peak_degrees")

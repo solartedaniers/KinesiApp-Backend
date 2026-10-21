@@ -7,14 +7,12 @@ from pydantic import ValidationError
 
 from app.analysis.progress import AnalysisProgressUpdate
 from app.analysis.knee_reading import KneeReadingExtractor
-from app.analysis.risk_assessment_codec import JOINT_NAMES, RiskAssessmentCodec
+from app.analysis.risk_assessment_codec import RiskAssessmentCodec, parse_measurement_name
 from app.analysis.risk_level import RiskLevelClassifier
 from app.models.jump_analysis import JointAngleMeasurement, JumpAnalysis, JumpAnalysisStatus
 from app.rpc.proto_values import timestamp
 
 logger = logging.getLogger(__name__)
-
-_JOINTS = {name: joint for joint, name in JOINT_NAMES.items()}
 
 
 class AnalysisMessages:
@@ -91,8 +89,7 @@ def _failure_reason(reason: str | None) -> ErrorReason.ValueType:
 
 
 def _sample(sample: JointAngleMeasurement) -> movement_pb2.JointAngleSample:
+    joint, side = parse_measurement_name(sample.joint_name)
     return movement_pb2.JointAngleSample(
-        joint=_JOINTS.get(sample.joint_name, movement_pb2.JOINT_ANGLE_UNSPECIFIED),
-        angle_degrees=sample.angle_degrees,
-        frame_timestamp_ms=sample.frame_timestamp_ms,
+        joint=joint, angle_degrees=sample.angle_degrees, frame_timestamp_ms=sample.frame_timestamp_ms, side=side
     )

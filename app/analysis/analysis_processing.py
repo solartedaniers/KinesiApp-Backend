@@ -12,7 +12,7 @@ from app.ai.remote_movement_analyzer import AnalyzerError, MovementAnalyzer
 from app.analysis.progress import AnalysisFinished, AnalysisProgressUpdate
 from app.analysis.progress_hub import AnalysisProgressHub
 from app.analysis.retry_policy import RetryPolicy
-from app.analysis.risk_assessment_codec import JOINT_NAMES, RiskAssessmentCodec
+from app.analysis.risk_assessment_codec import RiskAssessmentCodec, measurement_name
 from app.core.domain_error import DomainError
 from app.models.jump_analysis import AnalysisStage, JointAngleMeasurement, JumpAnalysis, JumpAnalysisStatus, MovementType
 from app.repositories.unit_of_work import UnitOfWork
@@ -163,7 +163,7 @@ class AnalysisProcessing:
             uow.analyses.add_measurements([
                 JointAngleMeasurement(
                     jump_analysis_id=analysis_id,
-                    joint_name=JOINT_NAMES[sample.joint],
+                    joint_name=measurement_name(sample),
                     angle_degrees=sample.angle_degrees,
                     frame_timestamp_ms=sample.frame_timestamp_ms,
                 )
