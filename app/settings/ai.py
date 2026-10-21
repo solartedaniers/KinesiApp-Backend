@@ -29,3 +29,5 @@ class AiClientSettings(EnvSettings):
     WAKE_UP_CALL_TIMEOUT_SECONDS: float = Field(default=15.0, gt=0)
     # Plazo de una respuesta del asistente en streaming: cubre el arranque en frío más lo que tarda Gemini
     ASSISTANT_TIMEOUT_SECONDS: float = Field(default=90.0, gt=0)
+    # Intentos del asistente si falla antes de dar texto: el segundo cubre un modelo que se quedó callado
+    ASSISTANT_ATTEMPTS: int = Field(default=2, ge=1)

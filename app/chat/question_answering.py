@@ -13,7 +13,8 @@ class QuestionAnswering:
     """Guardo la pregunta, pido la respuesta a la IA en streaming y la guardo.
 
     Guardo la pregunta antes de llamar a la IA: si la IA falla, igual cuenta para el límite y así nadie
-    lo esquiva provocando fallos.
+    lo esquiva provocando fallos. Si el usuario reintenta la misma pregunta que quedó sin respuesta, la reutilizo:
+    no la guardo dos veces ni la cuento otra vez.
     """
 
     def __init__(
@@ -36,10 +37,13 @@ class QuestionAnswering:
         async with self._uow_factory() as uow:
             # Bloqueo el hilo para contar y guardar de una vez: dos preguntas simultáneas no pasan el tope juntas
             await uow.conversations.lock(analysis_id, principal.user_id)
-            await self._limits.check(uow, conversation.id)
             history = await uow.messages.list_by_conversation(conversation.id)
-            asked = ChatMessage(conversation_id=conversation.id, role=ChatRole.USER, content=question)
-            uow.messages.add(asked)
+            if history and history[-1].role == ChatRole.USER and history[-1].content == question:
+                asked, history = history[-1], history[:-1]
+            else:
+                await self._limits.check(uow, conversation.id)
+                asked = ChatMessage(conversation_id=conversation.id, role=ChatRole.USER, content=question)
+                uow.messages.add(asked)
             await uow.commit()
         yield SavedMessage(asked)
         reply = None

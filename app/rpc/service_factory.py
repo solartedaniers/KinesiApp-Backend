@@ -24,6 +24,7 @@ from app.admin.user_provisioning import UserProvisioning
 from app.admin.user_role_assignment import UserRoleAssignment
 from app.ai.remote_assistant import RemoteAnalysisAssistant
 from app.ai.remote_lifecycle import RemoteAiLifecycle
+from app.ai.resilient_assistant import ResilientAssistant
 from app.ai.remote_movement_analyzer import RemoteMovementAnalyzer
 from app.ai.transport_factory import build_ai_transport
 from app.ai.warming_movement_analyzer import WarmingMovementAnalyzer
@@ -243,7 +244,11 @@ class RpcServiceFactory:
     def _chat(self) -> ChatServicer:
         chat = self._chat_settings
         facts = AnalysisFactsBuilder(self._risk_codec, self._risk_levels)
-        assistant = RemoteAnalysisAssistant(self._ai, self._ai_settings.ASSISTANT_TIMEOUT_SECONDS)
+        assistant = ResilientAssistant(
+            self._ai_lifecycle(),
+            RemoteAnalysisAssistant(self._ai, self._ai_settings.ASSISTANT_TIMEOUT_SECONDS),
+            self._ai_settings.ASSISTANT_ATTEMPTS,
+        )
         limits = ChatUsageLimits(chat.CHAT_RATE_LIMIT_PER_USER_PER_HOUR, chat.CHAT_RATE_LIMIT_GLOBAL_PER_MINUTE, self._clock)
         return ChatServicer(
             ChatInputRules(chat.CHAT_MESSAGE_MAX_CHARS),

@@ -197,6 +197,23 @@ def test_if_the_ai_fails_the_question_stays_saved_and_the_stream_ends_unavailabl
     assert stored == [(ChatRole.USER, "¿Y ahora?")]
 
 
+def test_retrying_an_unanswered_question_reuses_it_instead_of_saving_it_twice(tmp_path: Path) -> None:
+    async def scenario(world, stub, assistant):
+        _, athlete, _, analysis_id = await _people(world)
+        request = chat_pb2.SendMessageRequest(analysis_id=analysis_id, content="¿Y ahora?")
+        failed, _ = await _stream(stub.SendMessage(request, metadata=bearer(athlete)))
+        assistant.fail = False
+        retried, error = await _stream(stub.SendMessage(request, metadata=bearer(athlete)))
+        return failed, retried, error, await _messages(world)
+
+    failed, retried, error, stored = _run(tmp_path, scenario, _FakeAssistant(fail=True), per_hour=1)
+
+    # Con un tope de una pregunta por hora, el reintento pasa porque no cuenta como pregunta nueva
+    assert error is None
+    assert retried[0].user_message.id == failed[0].user_message.id
+    assert stored == [(ChatRole.USER, "¿Y ahora?"), (ChatRole.ASSISTANT, "Respuesta a ¿Y ahora?")]
+
+
 def test_past_the_hourly_limit_nothing_is_saved(tmp_path: Path) -> None:
     async def scenario(world, stub, assistant):
         _, athlete, _, analysis_id = await _people(world)
