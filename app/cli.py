@@ -1,7 +1,7 @@
-"""Admin CLI. Usage: python -m app.cli create-admin
+"""CLI de administración. Uso: python -m app.cli create-admin
 
-Credentials come from ADMIN_EMAIL / ADMIN_PASSWORD / ADMIN_FULL_NAME env vars,
-or are prompted interactively (password via getpass, never echoed or logged).
+Tomo las credenciales de ADMIN_EMAIL, ADMIN_PASSWORD y ADMIN_FULL_NAME o las pido en la terminal; la
+contraseña va por getpass, así que nunca se muestra ni queda en los logs.
 """
 import argparse
 import asyncio

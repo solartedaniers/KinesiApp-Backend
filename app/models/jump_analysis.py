@@ -68,7 +68,7 @@ class JumpAnalysis(Base):
     # Patrón que determinó el risk_score; None si ninguno se disparó
     dominant_risk_pattern: Mapped[str | None] = mapped_column(String(50), nullable=True)
     # Desglose por patrón, señal y repetición (kinesiapp_ai.analysis.risk_details). NULL en los análisis
-    # procesados antes de que existiera: el chat los atiende en modo reducido (diseño §6.3)
+    # procesados antes de que existiera: el chat los atiende en modo reducido
     risk_details: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # Con qué modelo y qué reglas se calculó, para no reinterpretar resultados viejos
     pose_model_version: Mapped[str | None] = mapped_column(String(100), nullable=True)

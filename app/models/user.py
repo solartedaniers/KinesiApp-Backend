@@ -24,8 +24,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     full_name: Mapped[str] = mapped_column(String(150), nullable=False)
-    # El registro público elige ATHLETE o COACH; ADMIN solo lo asigna otro admin
-    # vía PATCH /users/{id}/role
+    # El registro público elige ATHLETE o COACH; ADMIN solo lo asigna otro admin desde UserAdminService
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.ATHLETE, nullable=False)
     is_active: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -40,7 +39,7 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
 
-    # Consentimiento para grabar/subir video de saltos (docs/design/video-analysis-pipeline.md §8.4)
+    # Guardo la versión del consentimiento aceptada para poder pedirlo de nuevo si el texto cambia
     video_consent_given_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     video_consent_version: Mapped[int | None] = mapped_column(nullable=True)
 

@@ -37,7 +37,7 @@ class ChatConversation(Base):
 class ChatMessage(Base):
     __tablename__ = "chat_messages"
     __table_args__ = (
-        # Rate limit global (§6.7) e historial / rate limit por hilo
+        # Uno sirve al límite global por minuto y el otro al historial y al límite por hilo
         Index("ix_chat_messages_created_at", "created_at"),
         Index("ix_chat_messages_conversation_id_created_at", "conversation_id", "created_at"),
     )
