@@ -3,11 +3,12 @@ from kinesiapp.system.v1 import system_pb2
 from app.identity.password_policy import PasswordPolicy
 from app.settings.athlete import AthleteSettings
 from app.settings.chat import ChatSettings
+from app.settings.risk import RiskSettings
 from app.settings.storage import MediaSettings
 
 
 def build_client_policy(
-    media: MediaSettings, passwords: PasswordPolicy, athletes: AthleteSettings, chat: ChatSettings
+    media: MediaSettings, passwords: PasswordPolicy, athletes: AthleteSettings, chat: ChatSettings, risk: RiskSettings
 ) -> system_pb2.GetClientPolicyResponse:
     # Lo armo una vez al arrancar: la configuración no cambia mientras el proceso vive
     return system_pb2.GetClientPolicyResponse(
@@ -33,4 +34,5 @@ def build_client_policy(
             min_weight_kg=athletes.ATHLETE_MIN_WEIGHT_KG,
             max_weight_kg=athletes.ATHLETE_MAX_WEIGHT_KG,
         ),
+        risk_scale=system_pb2.RiskScalePolicy(moderate_from=risk.RISK_LEVEL_MODERATE, high_from=risk.RISK_LEVEL_HIGH),
     )

@@ -130,8 +130,8 @@ class RpcServiceFactory:
         self._ai_settings = AiClientSettings()
         self._ai = build_ai_transport(self._ai_settings)
         self._chat_settings = ChatSettings()
-        risk = RiskSettings()
-        self._risk_levels = RiskLevelClassifier(risk.RISK_LEVEL_MODERATE, risk.RISK_LEVEL_HIGH)
+        self._risk_settings = RiskSettings()
+        self._risk_levels = RiskLevelClassifier(self._risk_settings.RISK_LEVEL_MODERATE, self._risk_settings.RISK_LEVEL_HIGH)
         self._risk_codec = RiskAssessmentCodec()
         # Comparto el hub y el runner entre la subida, el seguimiento, el borrado y la recuperación del arranque
         self._analysis_settings = AnalysisSettings()
@@ -175,7 +175,9 @@ class RpcServiceFactory:
         )
 
     def _system(self) -> SystemServicer:
-        client_policy = build_client_policy(self._media_settings, self._password_policy, self._athlete_settings, self._chat_settings)
+        client_policy = build_client_policy(
+            self._media_settings, self._password_policy, self._athlete_settings, self._chat_settings, self._risk_settings
+        )
         return SystemServicer(self._clock, client_policy, self._ai_lifecycle())
 
     def _auth(self) -> AuthServicer:

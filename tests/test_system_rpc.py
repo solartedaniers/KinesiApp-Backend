@@ -14,6 +14,7 @@ from app.rpc.system_servicer import SystemServicer
 from app.settings.athlete import AthleteSettings
 from app.settings.auth import PasswordPolicySettings
 from app.settings.chat import ChatSettings
+from app.settings.risk import RiskSettings
 from app.settings.storage import MediaSettings
 from tests.ai_world import UnreachableAi
 from tests.grpc_harness import error_info, serving
@@ -32,6 +33,7 @@ def _client_policy() -> system_pb2.GetClientPolicyResponse:
         PasswordPolicy(PasswordPolicySettings(_env_file=None, PASSWORD_MIN_LENGTH=10)),
         AthleteSettings(_env_file=None),
         ChatSettings(_env_file=None, CHAT_MESSAGE_MAX_CHARS=500),
+        RiskSettings(_env_file=None, RISK_LEVEL_MODERATE=0.3, RISK_LEVEL_HIGH=0.7),
     )
 
 
@@ -71,6 +73,12 @@ def test_client_policy_comes_from_configuration() -> None:
     assert policy.chat_message_max_chars == 500
     biometrics = policy.biometrics
     assert (biometrics.min_height_cm, biometrics.max_height_cm, biometrics.min_weight_kg, biometrics.max_weight_kg) == (80, 250, 15, 250)
+    assert (policy.risk_scale.moderate_from, policy.risk_scale.high_from) == pytest.approx((0.3, 0.7))
+
+
+def test_risk_cuts_must_be_ordered() -> None:
+    with pytest.raises(ValueError, match="must be lower"):
+        RiskSettings(_env_file=None, RISK_LEVEL_MODERATE=0.7, RISK_LEVEL_HIGH=0.5)
 
 
 def test_athlete_ranges_must_be_ordered() -> None:
