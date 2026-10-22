@@ -112,5 +112,18 @@ pytest                              # pytest.ini agrega generated/ al path
 
   `deploy/grpc/entrypoint.sh` arma la configuración de Envoy con el `$PORT` que asigna Render, levanta los dos procesos y termina el contenedor si cualquiera cae.
 - Las variables se definen en Render. La IA se alcanza con `AI_TRANSPORT=grpc`, `AI_GRPC_TLS=true` y `AI_SERVICE_URL=<fqdn de Container Apps>:443`.
-- Antes de desplegar un cambio de esquema, corro `alembic upgrade head` desde local.
+- Antes de desplegar un cambio de esquema, corro `alembic upgrade head` desde local, por el endpoint directo de Neon (no el `-pooler`).
+
+### Ambientes
+
+| | Producción | Desarrollo |
+|---|---|---|
+| Servicio | `kinesiapp-backend-grpc` en Render, desde `main`: https://kinesiapp-backend-grpc.onrender.com | el servidor (`python -m app.rpc.server`) o el contenedor, en local |
+| Base | branch `production` de Neon (`-pooler`), Alembic en la head `a2d6f8c4e157` | branch `grpc-dev` |
+| Archivos | `kinesiapp-prod-images` y `kinesiapp-prod-videos`, privados, con CORS solo para `kinesiapp.com`, `www.kinesiapp.com` y los previews de Vercel | `kinesiapp-dev-images` y `kinesiapp-dev-videos` |
+| Quién lo usa | `www.kinesiapp.com` y también los previews de Vercel | el frontend en local |
+
+- Para volver Render a grpc-dev se cambian cuatro variables (`POSTGRES_HOST`, `S3_PRIVATE_IMAGES_BUCKET`, `S3_PRIVATE_VIDEOS_BUCKET` y `JWT_SECRET_KEY`) y la rama. La URL no cambia.
+- `scripts/cloud_check.py` espera por defecto los buckets y orígenes de producción; contra grpc-dev se pasan con `--images-bucket`, `--videos-bucket` y `--origin`.
+- `scripts/copy_dev_accounts.py` copió al corte las cuentas elegidas de grpc-dev a producción, con su hash de contraseña, sus datos y sus archivos. Corre en seco por defecto y es idempotente.
 - Mover el backend de Oregón a Frankfurt bajó las llamadas simples de 2.5–4 s a ~0.6 s. Cada RPC autenticado hace unas 20 idas y vueltas a la base, y la distancia a Neon las multiplicaba.
