@@ -147,7 +147,7 @@ git clone --recurse-submodules https://github.com/solartedaniers/KinesiApp-Backe
 cd KinesiApp-Backend
 python -m venv .venv && .venv/Scripts/pip install -r requirements-dev.txt   # en Linux/macOS: .venv/bin/pip
 python scripts/generate_grpc.py      # genera generated/ desde contracts/
-cp .env.example .env                 # y lleno los valores
+cp .env.example .env                 # y lo lleno con la tabla de Configuración
 ```
 
 1. **Migrar.** Las migraciones las corro desde local contra el endpoint directo de Neon (sin `-pooler`), nunca desde el contenedor:
@@ -180,6 +180,22 @@ pytest                              # pytest.ini agrega generated/ al path
 - Las pruebas de RPC levantan un servidor gRPC real en un puerto libre, con los interceptores de verdad (`tests/grpc_harness.py`, `tests/rpc_world.py`). La IA y el bucket son dobles en memoria.
 - `tests/test_grpc_server_imports.py` comprueba que el servidor arranca sin FastAPI, sin la IA como librería y sin Alembic. Esas dependencias no van en la imagen.
 - `scripts/cloud_check.py` es la prueba de punta a punta contra el despliegue real. Usa `buf curl` por gRPC-Web, con cuentas de prueba, y borra todo lo que crea.
+
+## Errores comunes
+
+| Lo que veo | Por qué pasa | Cómo lo arreglo |
+|---|---|---|
+| `contracts/` está vacío o `generate_grpc.py` no encuentra los `.proto` | Cloné sin `--recurse-submodules`. | `git submodule update --init` y vuelvo a generar. |
+| `ModuleNotFoundError: No module named 'kinesiapp'` | No generé el código o `generated/` no está en el path. | `python scripts/generate_grpc.py`. Al levantar el servidor, `PYTHONPATH=generated` (en PowerShell, `$env:PYTHONPATH="generated"`). |
+| El servidor no arranca con un `ValidationError` de pydantic | Falta una variable obligatoria o tiene un valor inválido, por ejemplo un `AI_SERVICE_TOKEN` de menos de 32 caracteres. | El error dice el nombre de la variable; la busco en la tabla de Configuración. |
+| No arranca porque el lease es muy corto | `ANALYSIS_PROCESSING_LEASE_SECONDS` no supera `AI_WAKE_UP_TIMEOUT_SECONDS` + `ANALYSIS_STREAM_TIMEOUT_SECONDS`. | Subo el lease o bajo los otros dos. |
+| Una migración falla o se comporta raro | La corrí por el endpoint `-pooler`. El pooler de Neon reparte conexiones por transacción y no es para migraciones. | Para migrar, cambio `POSTGRES_HOST` al endpoint directo, sin `-pooler`. |
+| La primera llamada tarda varios segundos | Neon suspende la base sin uso y tarda en despertar. | Es normal. `pool_pre_ping` reemplaza la conexión cerrada y la siguiente ya va rápida. |
+| `EMAIL_DELIVERY_FAILED` | Falta `RESEND_API_KEY`, o el remitente no es de un dominio verificado. Con `onboarding@resend.dev`, Resend solo entrega al dueño de la cuenta. | Pongo la clave y un remitente de un dominio verificado. |
+| `STORAGE_UNAVAILABLE` al subir o leer un archivo | Faltan las credenciales de Neon Storage o los buckets privados. | Lleno `AWS_*` y `S3_PRIVATE_*`. |
+| El navegador bloquea la subida al bucket por CORS | El origen del frontend no está en el CORS del bucket. | Agrego el origen al CORS del bucket (en desarrollo, `http://localhost:3000`) y lo compruebo con `scripts/cloud_check.py`, que hace el preflight desde cada origen. |
+| `UNAVAILABLE` con reason `AI_UNAVAILABLE` | La IA está dormida (escala a cero) o `AI_SERVICE_URL` está mal. | En frío tarda 20–33 s en despertar y el backend reintenta solo. Si sigue, reviso la URL y que la revisión de Azure esté sana. |
+| `UNAUTHENTICATED` desde la IA | El `AI_SERVICE_TOKEN` del backend no es el mismo que el de la IA. | Pongo el mismo valor en Render y en los secretos de Container Apps. |
 
 ## Despliegue
 
