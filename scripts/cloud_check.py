@@ -3,8 +3,11 @@
 Uso, desde KinesiApp-Backend:
   python -I scripts/cloud_check.py --admin-email <correo> [--athlete-email <correo> --coach-email <correo>]
       [--only account,admin,refresh,athlete,team,ai] [--origin <origen> [<origen>...]]
+      [--images-bucket <bucket> --videos-bucket <bucket>]   por defecto, los de producción
+  Contra grpc-dev: --url <backend> --images-bucket kinesiapp-dev-images --videos-bucket kinesiapp-dev-videos
+      --origin https://kinesiapp.com https://www.kinesiapp.com http://localhost:3000
   python -I scripts/cloud_check.py --only analysis --athlete-email <correo> --video <mp4> --video-duration-ms <ms>
-      [--keep-on-failure]   deja el análisis y su video si algo falla, para revisarlos en la base de grpc-dev
+      [--keep-on-failure]   deja el análisis y su video si algo falla, para revisarlos en la base
       [--upload-min-kbps N] velocidad de subida más lenta que espero en el PUT del video (1000 por defecto)
 Las contraseñas las leo de KINESI_ADMIN_PASSWORD, KINESI_ATHLETE_PASSWORD y KINESI_COACH_PASSWORD, o las pido por consola.
 Todo lo que creo (deportistas gestionados, equipos, fotos, análisis y su video) lo borro al final; lo que edito lo dejo como estaba.
@@ -24,19 +27,21 @@ import urllib.error
 import urllib.request
 import zlib
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from pathlib import Path
 
 BACKEND = Path(__file__).resolve().parents[1]
 DEFAULT_URL = "https://kinesiapp-backend-grpc.onrender.com"
+# Lo que espero del backend de producción. Contra otro ambiente (grpc-dev en local) se pasan por argumento,
+# porque el script no sabe a qué buckets apunta el servidor que prueba
 DEFAULT_ORIGINS = [
     "https://kinesiapp.com",
     "https://www.kinesiapp.com",
     "https://kinesiapp-git-feature-grpc-frontend-solartedaniers-projects.vercel.app",
-    "http://localhost:3000",
 ]
+DEFAULT_IMAGES_BUCKET = "kinesiapp-prod-images"
+DEFAULT_VIDEOS_BUCKET = "kinesiapp-prod-videos"
 FOREIGN_ORIGIN = "https://example.com"
-PRIVATE_IMAGES_BUCKET = "kinesiapp-dev-images"
-PRIVATE_VIDEOS_BUCKET = "kinesiapp-dev-videos"
 ALL_SECTIONS = ("account", "admin", "refresh", "athlete", "team", "ai", "analysis")
 # Dos preguntas seguidas bastan para ver el respaldo y el historial; más gastaban la cuota diaria de Gemini
 DEFAULT_QUESTIONS = [
@@ -176,11 +181,20 @@ def check_cors(report: Report, label: str, url: str, origins: list[str]) -> None
     report.check(f"{label}: CORS preflight from a foreign origin is refused", "access-control-allow-origin" not in headers, f"status={status}")
 
 
-def upload_png(report: Report, label: str, upload: dict, origins: list[str]) -> bytes:
+@dataclass(frozen=True)
+class StorageExpectations:
+    """Buckets privados y orígenes de CORS que debe tener el ambiente que pruebo."""
+
+    origins: list[str]
+    images_bucket: str
+    videos_bucket: str
+
+
+def upload_png(report: Report, label: str, upload: dict, storage: StorageExpectations) -> bytes:
     png = tiny_png()
     target = upload["target"]
-    report.check(f"{label}: upload URL points to the private bucket", PRIVATE_IMAGES_BUCKET in target["url"])
-    check_cors(report, label, target["url"], origins)
+    report.check(f"{label}: upload URL points to the private bucket", f"/{storage.images_bucket}/" in target["url"], storage.images_bucket)
+    check_cors(report, label, target["url"], storage.origins)
     status, _, _ = http("PUT", target["url"], png + b"x", target.get("headers", {}))
     report.check(f"{label}: PUT with another size is rejected by the signature", status >= 400, f"status={status}")
     status, _, _ = http("PUT", target["url"], png, target.get("headers", {}))
@@ -201,7 +215,7 @@ def check_object_gone(report: Report, label: str, avatar_url: str) -> None:
     report.check(f"{label}: object is gone from the bucket", status in (403, 404), f"status={status}")
 
 
-def account_section(rpc: RpcClient, report: Report, admin: Session, origins: list[str]) -> None:
+def account_section(rpc: RpcClient, report: Report, admin: Session, storage: StorageExpectations) -> None:
     token = admin.access_token
     account, error = rpc.call("kinesiapp.account.v1.AccountService/GetMyAccount", {}, token)
     if not report.check("GetMyAccount", error is None, error):
@@ -225,7 +239,7 @@ def account_section(rpc: RpcClient, report: Report, admin: Session, origins: lis
         return
     _, error = rpc.call("kinesiapp.account.v1.AccountService/ConfirmAvatarUpload", {"uploadId": upload["uploadId"]}, token)
     report.check("Confirm before PUT is UPLOAD_NOT_FOUND", error and error["reason"] == "UPLOAD_NOT_FOUND", error)
-    png = upload_png(report, "Account avatar", upload, origins)
+    png = upload_png(report, "Account avatar", upload, storage)
     confirmed, error = rpc.call("kinesiapp.account.v1.AccountService/ConfirmAvatarUpload", {"uploadId": upload["uploadId"]}, token)
     if not report.check("ConfirmAvatarUpload", error is None and "avatar" in confirmed["account"], error):
         return
@@ -280,7 +294,7 @@ BIOMETRICS = {"gender": "GENDER_MALE", "heightCm": 172.0, "weightKg": 68.0, "bir
 
 
 def athlete_section(
-    rpc: RpcClient, report: Report, admin: Session, athlete: Session, coach: Session, origins: list[str]
+    rpc: RpcClient, report: Report, admin: Session, athlete: Session, coach: Session, storage: StorageExpectations
 ) -> tuple[str, str | None] | None:
     # Devuelvo el deportista gestionado y la URL de su foto para que equipos los use y el final los borre
     profiles = "kinesiapp.athlete.v1.AthleteProfileService"
@@ -365,7 +379,7 @@ def athlete_section(
         coach.access_token,
     )
     if report.check("CreateManagedAthleteAvatarUpload", error is None, error):
-        png = upload_png(report, "Managed avatar", upload, origins)
+        png = upload_png(report, "Managed avatar", upload, storage)
         confirmed, error = rpc.call(
             f"{managed}/ConfirmManagedAthleteAvatarUpload", {"athleteId": managed_id, "uploadId": upload["uploadId"]}, coach.access_token
         )
@@ -457,7 +471,7 @@ def analysis_section(
     athlete: Session,
     video: Path,
     duration_ms: int,
-    origins: list[str],
+    storage: StorageExpectations,
     keep_on_failure: bool,
     upload_min_kbps: int,
     movement: str,
@@ -489,8 +503,8 @@ def analysis_section(
     if not report.check("CreateVideoUpload", error is None, error):
         return
     target = upload["target"]
-    report.check("Upload URL points to the private videos bucket", PRIVATE_VIDEOS_BUCKET in target["url"])
-    check_cors(report, "Video", target["url"], origins)
+    report.check("Upload URL points to the private videos bucket", f"/{storage.videos_bucket}/" in target["url"], storage.videos_bucket)
+    check_cors(report, "Video", target["url"], storage.origins)
     put_timeout = upload_timeout(len(content), upload_min_kbps)
     status, _, _ = timed(
         "PUT to the bucket", lambda: http("PUT", target["url"], content, target.get("headers", {}), put_timeout)
@@ -582,6 +596,8 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--url", default=DEFAULT_URL)
     parser.add_argument("--origin", dest="origins", nargs="+", default=DEFAULT_ORIGINS, help="frontend origins that must pass the bucket CORS")
+    parser.add_argument("--images-bucket", default=DEFAULT_IMAGES_BUCKET, help="private images bucket the backend must sign for")
+    parser.add_argument("--videos-bucket", default=DEFAULT_VIDEOS_BUCKET, help="private videos bucket the backend must sign for")
     parser.add_argument("--admin-email")
     parser.add_argument("--athlete-email")
     parser.add_argument("--coach-email")
@@ -604,9 +620,10 @@ def main() -> int:
     buf = shutil.which("buf") or str(BACKEND.parent / "KinesiApp-Frontend" / "node_modules" / ".bin" / ("buf.cmd" if os.name == "nt" else "buf"))
     rpc = RpcClient(args.url, buf, BACKEND / "contracts" / "proto")
     report = Report()
+    storage = StorageExpectations(args.origins, args.images_bucket, args.videos_bucket)
     admin = Session(rpc, args.admin_email, _password("KINESI_ADMIN_PASSWORD", "Admin")) if sections & ADMIN_SECTIONS else None
     if "account" in sections:
-        account_section(rpc, report, admin, args.origins)
+        account_section(rpc, report, admin, storage)
     if "admin" in sections:
         admin_section(rpc, report, admin)
     athlete = None
@@ -614,7 +631,7 @@ def main() -> int:
         athlete = Session(rpc, args.athlete_email, _password("KINESI_ATHLETE_PASSWORD", "Athlete"))
     if sections & {"athlete", "team"}:
         coach = Session(rpc, args.coach_email, _password("KINESI_COACH_PASSWORD", "Coach"))
-        managed = athlete_section(rpc, report, admin, athlete, coach, args.origins) if "athlete" in sections else None
+        managed = athlete_section(rpc, report, admin, athlete, coach, storage) if "athlete" in sections else None
         managed_id, avatar_url = managed if managed else (None, None)
         try:
             if "team" in sections:
@@ -625,7 +642,7 @@ def main() -> int:
     if "ai" in sections:
         ai_section(rpc, report, admin)
     if "analysis" in sections:
-        analysis_section(rpc, report, athlete, args.video, args.video_duration_ms, args.origins, args.keep_on_failure, args.upload_min_kbps,
+        analysis_section(rpc, report, athlete, args.video, args.video_duration_ms, storage, args.keep_on_failure, args.upload_min_kbps,
                          args.movement, args.questions or DEFAULT_QUESTIONS)
     if "refresh" in sections:
         refresh_section(rpc, report, admin)
