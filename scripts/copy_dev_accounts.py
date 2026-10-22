@@ -269,8 +269,7 @@ class AccountCopier:
             new_id = await self._insert("jump_analyses", values)
             analysis_map[row["id"]] = new_id
             measurements = await self._source.fetch("select * from joint_angle_measurements where jump_analysis_id = $1 order by id", row["id"])
-            for measurement in measurements:
-                await self._insert("joint_angle_measurements", {**dict(measurement), "jump_analysis_id": new_id})
+            await self._insert_many("joint_angle_measurements", [{**dict(m), "jump_analysis_id": new_id} for m in measurements])
             self._report.add(f"análisis {row['id']} ({row['movement_type']}, {row['recorded_at']:%Y-%m-%d}): lo copio con {len(measurements)} mediciones")
         return analysis_map
 
@@ -288,8 +287,7 @@ class AccountCopier:
                 continue
             new_id = await self._insert("chat_conversations", {**dict(row), "user_id": user_id, "jump_analysis_id": analysis_id})
             messages = await self._source.fetch("select * from chat_messages where conversation_id = $1 order by id", row["id"])
-            for message in messages:
-                await self._insert("chat_messages", {**dict(message), "conversation_id": new_id})
+            await self._insert_many("chat_messages", [{**dict(m), "conversation_id": new_id} for m in messages])
             self._report.add(f"chat {row['id']}: lo copio con {len(messages)} mensajes")
 
     async def _copy_teams(self, source_ids: set[int], user_map: dict[int, int], profile_map: dict[int, int]) -> None:
@@ -355,6 +353,13 @@ class AccountCopier:
         return await self._target.fetchval(
             f"insert into {table} ({', '.join(columns)}) values ({placeholders}) returning id", *(values[c] for c in columns)
         )
+
+    async def _insert_many(self, table: str, rows: list[dict]) -> None:
+        # Uso COPY porque fila por fila cada inserción cuesta una ida y vuelta a Neon (~400 ms desde local)
+        if not self._apply or not rows:
+            return
+        columns = [c for c in await self._columns(table) if c != "id" and c in rows[0]]
+        await self._target.copy_records_to_table(table, records=[tuple(r[c] for c in columns) for r in rows], columns=columns)
 
     async def _update(self, table: str, row_id: int, values: dict) -> None:
         if not self._apply:
@@ -440,4 +445,6 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
+    # Imprimo línea a línea aunque la salida vaya a un archivo, para ver el avance de una corrida larga
+    sys.stdout.reconfigure(line_buffering=True)
     asyncio.run(main())
