@@ -197,6 +197,32 @@ pytest                              # pytest.ini agrega generated/ al path
 | `UNAVAILABLE` con reason `AI_UNAVAILABLE` | La IA está dormida (escala a cero) o `AI_SERVICE_URL` está mal. | En frío tarda 20–33 s en despertar y el backend reintenta solo. Si sigue, reviso la URL y que la revisión de Azure esté sana. |
 | `UNAUTHENTICATED` desde la IA | El `AI_SERVICE_TOKEN` del backend no es el mismo que el de la IA. | Pongo el mismo valor en Render y en los secretos de Container Apps. |
 
+## Flujo de trabajo
+
+- **Trabajo en ramas feature.** Aquí es `feature/grpc-backend`. Nunca hago commit directo en `main`; fusiono con `--no-ff` cuando el cambio está probado.
+- **El push a `main` despliega a producción.** Render reconstruye el backend desde `main` y Vercel hace lo mismo con el frontend. Las ramas feature del backend no se despliegan.
+- **La IA necesita un paso a mano.** Su push construye la imagen `ghcr.io/solartedaniers/kinesiapp-ai:<sha>`, pero Azure sigue en la revisión anterior hasta que corro `az containerapp update -n kinesiapp-ia -g kinesiapp-rg --image ghcr.io/solartedaniers/kinesiapp-ai:<sha>`.
+- **Las migraciones se corren a mano.** El contenedor no migra al arrancar. Antes de fusionar un cambio de esquema, corro `alembic upgrade head` desde local contra production, por el endpoint directo.
+- **Las previews usan la base real.** Cada rama del frontend tiene un preview en Vercel que habla con este backend de producción, así que lo que creo en un preview queda en la base de production. Para probar con datos de mentira uso el entorno local contra grpc-dev.
+- **Contract-first.** Si cambia un RPC, primero va el contrato con un tag nuevo en KinesiApp-Contracts. Después muevo el submódulo y regenero.
+
+## Producción
+
+La app está publicada en **https://www.kinesiapp.com**.
+
+| Servicio | Dónde corre | Cómo llega a producción |
+|---|---|---|
+| Frontend (Next.js) | Vercel, con las funciones en `fra1` (Fráncfort) | Push a `main`, automático |
+| Backend (Envoy + `grpcio`) | Render en Frankfurt, como servicio Docker: https://kinesiapp-backend-grpc.onrender.com | Push a `main`, automático |
+| IA (Envoy + `grpcio`) | Azure Container Apps en `canadacentral`, con 0 a 1 réplica | `az containerapp update` con la imagen de GHCR |
+| Base de datos | Neon Postgres en Frankfurt, branch `production` | Migraciones a mano con Alembic |
+| Archivos | Neon Storage, buckets privados `kinesiapp-prod-images` y `kinesiapp-prod-videos` | — |
+| Correo | Resend | — |
+| Dominio | `kinesiapp.com`, comprado en Namecheap, con DNS hacia Vercel | — |
+
+- **Correos.** Los códigos de verificación y de recuperación de contraseña salen desde `KinesiApp <no-reply@kinesiapp.com>` con Resend. El dominio `kinesiapp.com` está verificado en Resend, así que los correos llegan a cualquier persona y no solo al dueño de la cuenta.
+- **CORS de los buckets.** Los de producción solo aceptan `https://www.kinesiapp.com`, `https://kinesiapp.com` y las previews de Vercel (`https://kinesiapp-*-solartedaniers-projects.vercel.app`). Además, solo permiten PUT, GET y HEAD. Cualquier otro origen recibe el preflight rechazado.
+
 ## Despliegue
 
 - **Render (Frankfurt), junto a Neon.** Es un servicio Docker con `deploy/grpc/Dockerfile`, que hace tres cosas:
