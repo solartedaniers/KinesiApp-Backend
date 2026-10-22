@@ -1,4 +1,4 @@
-"""Replace athlete sport with gender (the app is football-only).
+"""Cambio el deporte del deportista por el género (la app es solo de fútbol).
 
 Revision ID: b7e41d9c2a63
 Revises: 9d2e6a1c5b47

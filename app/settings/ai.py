@@ -1,0 +1,33 @@
+from typing import Literal
+
+from pydantic import Field, SecretStr
+from pydantic_settings import SettingsConfigDict
+
+from app.settings.base import ENV_FILE, EnvSettings
+
+
+class AiClientSettings(EnvSettings):
+    """Configuro cómo llego al microservicio de IA con las variables AI_*."""
+
+    model_config = SettingsConfigDict(env_prefix="AI_", env_file=ENV_FILE, env_file_encoding="utf-8", extra="ignore")
+
+    # Con grpc-web, la URL base de su Envoy (https://...); con grpc, el destino host:puerto de la red privada
+    SERVICE_URL: str = Field(min_length=1)
+    # Sin valor por defecto, como todo secreto: si falta, el backend no arranca
+    SERVICE_TOKEN: SecretStr = Field(min_length=32)
+    # gRPC-Web pasa por cualquier proxy HTTP/1.1; con la IA en Azure uso grpc, que su ingress acepta por HTTP/2
+    TRANSPORT: Literal["grpc-web", "grpc"] = "grpc-web"
+    # Con grpc, si cifro el canal. Lo dejo activo por defecto porque el ingress de Container Apps termina TLS en
+    # el 443; solo lo apago dentro de una red privada
+    GRPC_TLS: bool = True
+    CONNECT_TIMEOUT_SECONDS: float = Field(default=10.0, gt=0)
+    # Lo que espero a que la IA despierte. Desde Render hasta Azure Container Apps medí 33 s desde dormida hasta READY
+    WAKE_UP_TIMEOUT_SECONDS: float = Field(default=60.0, gt=0)
+    # Mientras su Envoy responde UNAVAILABLE porque grpcio todavía arranca, reintento cada tanto
+    WAKE_UP_RETRY_INTERVAL_SECONDS: float = Field(default=2.0, gt=0)
+    # Cada llamada a WarmUp por separado: corta, porque la espera larga la cubre el reintento
+    WAKE_UP_CALL_TIMEOUT_SECONDS: float = Field(default=15.0, gt=0)
+    # Plazo de una respuesta del asistente en streaming: cubre el arranque en frío más lo que tarda Gemini
+    ASSISTANT_TIMEOUT_SECONDS: float = Field(default=90.0, gt=0)
+    # Intentos del asistente si la conexión con la IA se corta antes de dar texto; sus errores no se reintentan
+    ASSISTANT_ATTEMPTS: int = Field(default=2, ge=1)

@@ -13,7 +13,7 @@ class ResendEmailSender:
 
     def __init__(self, api_key: str, from_email: str, timeout_seconds: int) -> None:
         # El SDK sólo admite configuración global del módulo: hay un único sender por proceso
-        # (ver app/services/email_factory.py), así que no hay dos configuraciones que choquen
+        # (lo arma ServiceFactory), así que no hay dos configuraciones que choquen
         resend.api_key = api_key
         resend.default_http_client = resend.RequestsClient(timeout=timeout_seconds)
         self._from_email = from_email

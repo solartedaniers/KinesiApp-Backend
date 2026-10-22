@@ -1,4 +1,4 @@
-"""Add profile photo (data URL) to users and coach-managed athletes.
+"""Agrego la foto de perfil (data URL) a los usuarios y a los deportistas gestionados.
 
 Revision ID: c3f8a1d6e924
 Revises: b7e41d9c2a63

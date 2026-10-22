@@ -1,25 +1,24 @@
-fastapi==0.115.6
-# Requerido por UploadFile/Form (subida multipart del video de salto)
-python-multipart==0.0.32
-uvicorn[standard]==0.34.0
-sqlalchemy==2.0.36
-psycopg2-binary==2.9.10
-alembic==1.14.0
+# Servidor gRPC (app/rpc). La IA es otro servicio: aquí no van MediaPipe, OpenCV ni YOLO
+grpcio==1.84.0
+# Para devolver google.rpc.Status con ErrorInfo/BadRequest en los errores (trae googleapis-common-protos)
+grpcio-status==1.84.0
+# Igual o más nueva que la que usa grpcio-tools para generar el código
+protobuf==7.36.2
 pydantic-settings==2.7.1
-pydantic[email]>=2.12.5,<3.0.0
+# Modelos ORM con sesiones asíncronas sobre asyncpg
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.32.0
+# El interceptor de autenticación valida los mismos JWT que emite el backend
+PyJWT==2.10.1
+# Autenticación: bcrypt, validación de correos con su DNS/MX y envío por Resend
 passlib==1.7.4
 bcrypt==4.0.1
-PyJWT==2.10.1
-# Paquete de IA (repo KinesiApp_IA, kinesiapp-ai): análisis de pose con MediaPipe, riesgo y chat
-# con Gemini, y detección de personas con YOLO. Fijado a un tag de versión, no a main. Trae fijadas sus
-# propias dependencias (mediapipe, opencv, numpy, scipy, google-genai, httpx, onnxruntime)
-kinesiapp-ai @ git+https://github.com/solartedaniers/KinesiApp_IA.git@v0.2.0
-# Almacenamiento de objetos S3 de Neon (app/storage)
-boto3==1.43.108
-# app/storage/neon_object_storage.py lo importa directo (Config y errores): no depender de que llegue transitivo
-botocore==1.43.108
-# Correo transaccional (app/mail/resend_email_sender.py)
-resend==2.49.1
-# Verificación DNS/MX del dominio del correo (app/services/email_domain_checker.py): se importan directo
+pydantic[email]>=2.12.5,<3.0.0
 email-validator==2.3.0
 dnspython==2.8.0
+resend==2.49.1
+# Firmar URLs del bucket y revisar lo que el navegador subió (Neon Storage es compatible con S3)
+boto3==1.43.108
+botocore==1.43.108
+# Cliente gRPC-Web hacia la IA (app/ai/grpc_web_transport.py): hoy su Envoy solo acepta HTTP/1.1
+httpx==0.28.1

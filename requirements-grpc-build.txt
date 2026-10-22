@@ -1,0 +1,2 @@
+# Solo para generar el código de los contratos (scripts/generate_grpc.py); no va en la imagen final
+grpcio-tools==1.84.0

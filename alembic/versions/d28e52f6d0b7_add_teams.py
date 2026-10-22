@@ -1,4 +1,4 @@
-"""Add teams and team_members (groups of athletes owned by a coach or an admin).
+"""Agrego teams y team_members (grupos de deportistas de un entrenador o un admin).
 
 Revision ID: d28e52f6d0b7
 Revises: 3b8fa7cd75a7

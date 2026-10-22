@@ -1,4 +1,4 @@
-"""Store only hashed OTPs and limit verification attempts.
+"""Guardo solo el hash de los OTP y limito los intentos de verificación.
 
 Revision ID: 4c9b8e2f7d31
 Revises: 83fa42007776

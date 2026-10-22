@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy import Column, DateTime, ForeignKey, String, Table, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.core.database import Base
+from app.models.base import Base
 
 
 def _utc_now() -> datetime:
@@ -30,6 +30,8 @@ class Team(Base):
     # Quien lo creó: un COACH (sólo agrupa a sus deportistas) o un ADMIN (a cualquiera)
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now, nullable=False)
+    # URL canónica en el bucket privado de imágenes; sin logo, el front dibuja un emblema con las iniciales
+    logo_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     owner: Mapped["User"] = relationship()
     athletes: Mapped[list["AthleteProfile"]] = relationship(secondary=team_members, back_populates="teams")

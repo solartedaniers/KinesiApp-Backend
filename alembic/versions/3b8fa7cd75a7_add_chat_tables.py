@@ -1,4 +1,4 @@
-"""Add chat_conversations and chat_messages (one thread per analysis and user).
+"""Agrego chat_conversations y chat_messages (un hilo por análisis y usuario).
 
 Revision ID: 3b8fa7cd75a7
 Revises: d4b9f2a7c615

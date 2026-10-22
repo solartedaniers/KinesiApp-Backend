@@ -1,4 +1,4 @@
-"""ResendEmailSender, su armado desde Settings y la verificación DNS del dominio, sin red."""
+"""Pruebo ResendEmailSender, su armado desde Settings y la verificación DNS del dominio, sin red."""
 import dns.exception
 import dns.resolver
 import pytest
@@ -6,12 +6,12 @@ import resend
 from pydantic import SecretStr
 from resend.exceptions import ResendError
 
-from app.core.config import settings
+from app.settings.mail import MailSettings
 from app.mail.email_sender import EmailDeliveryError, UnconfiguredEmailSender
 from app.mail.resend_email_sender import ResendEmailSender
-from app.services import email_domain_checker
-from app.services.email_domain_checker import EmailDomainChecker
-from app.services.email_factory import build_email_sender
+from app.mail import email_domain_checker
+from app.mail.email_domain_checker import EmailDomainChecker
+from app.mail.sender_factory import build_email_sender
 
 
 def _sender(monkeypatch, outcome):
@@ -43,15 +43,13 @@ def test_provider_and_network_errors_become_email_delivery_errors(monkeypatch):
         sender.send("ana@example.com", "Asunto", "Cuerpo")
 
 
-def test_factory_without_api_key_returns_a_sender_that_fails_explicitly(monkeypatch):
-    monkeypatch.setattr(settings, "RESEND_API_KEY", SecretStr(""))
-    sender = build_email_sender(settings)
+def test_factory_without_api_key_returns_a_sender_that_fails_explicitly():
+    sender = build_email_sender(MailSettings(_env_file=None, RESEND_API_KEY=SecretStr("")))
     assert isinstance(sender, UnconfiguredEmailSender)
     with pytest.raises(EmailDeliveryError, match="RESEND_API_KEY"):
         sender.send("ana@example.com", "Asunto", "Cuerpo")
 
-    monkeypatch.setattr(settings, "RESEND_API_KEY", SecretStr("re_test"))
-    assert isinstance(build_email_sender(settings), ResendEmailSender)
+    assert isinstance(build_email_sender(MailSettings(_env_file=None, RESEND_API_KEY=SecretStr("re_test"))), ResendEmailSender)
 
 
 class _FakeAnswer(list):
@@ -67,7 +65,7 @@ class _MxRecord:
 
 
 class _FakeResolver:
-    """Resolver que responde lo que el test indique por tipo de registro; nunca sale a la red."""
+    """Simulo un resolver que responde lo que el test indique por tipo de registro, sin salir a la red."""
 
     def __init__(self, answers):
         self._answers = answers

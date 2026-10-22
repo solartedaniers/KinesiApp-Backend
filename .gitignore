@@ -9,6 +9,5 @@ venv/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
-# Modelos de pose (MediaPipe) y de detección de personas (YOLO): se descargan (ver README.md)
-models/*.task
-models/*.onnx
+# Código generado de los contratos (scripts/generate_grpc.py): se produce en el build
+generated/

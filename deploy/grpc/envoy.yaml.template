@@ -1,0 +1,52 @@
+# Pongo Envoy delante porque Render solo acepta HTTP/1.1 desde internet: recibo gRPC-Web y lo traduzco a
+# gRPC nativo hacia grpcio en el mismo contenedor. Los marcadores __ASÍ__ los reemplazo en entrypoint.sh.
+static_resources:
+  listeners:
+    - name: grpc_web
+      address:
+        socket_address: { address: 0.0.0.0, port_value: __LISTEN_PORT__ }
+      filter_chains:
+        - filters:
+            - name: envoy.filters.network.http_connection_manager
+              typed_config:
+                "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
+                stat_prefix: grpc_web
+                codec_type: AUTO
+                route_config:
+                  name: backend
+                  virtual_hosts:
+                    - name: backend
+                      domains: ["*"]
+                      routes:
+                        # Respondo aquí el health check de Render, sin pasar por grpcio
+                        - match: { path: /healthz }
+                          direct_response: { status: 200, body: { inline_string: ok } }
+                        # Solo dejo pasar los servicios del contrato; cualquier otra ruta es 404
+                        - match: { prefix: /kinesiapp. }
+                          route:
+                            cluster: grpc_backend
+                            # Quito el límite de Envoy porque cada RPC ya trae su propio deadline desde el cliente
+                            timeout: 0s
+                http_filters:
+                  - name: envoy.filters.http.grpc_web
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_web.v3.GrpcWeb
+                  - name: envoy.filters.http.router
+                    typed_config:
+                      "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+    - name: grpc_backend
+      type: STATIC
+      connect_timeout: __ENVOY_CONNECT_TIMEOUT__
+      load_assignment:
+        cluster_name: grpc_backend
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address: { address: 127.0.0.1, port_value: __GRPC_PORT__ }
+      typed_extension_protocol_options:
+        envoy.extensions.upstreams.http.v3.HttpProtocolOptions:
+          "@type": type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions
+          explicit_http_config:
+            http2_protocol_options: {}

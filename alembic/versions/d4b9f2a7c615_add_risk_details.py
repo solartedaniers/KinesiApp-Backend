@@ -1,4 +1,4 @@
-"""Add risk_details (per-pattern, per-signal, per-repetition breakdown) to jump_analyses.
+"""Agrego a jump_analyses risk_details (desglose por patrón, señal y repetición).
 
 Revision ID: d4b9f2a7c615
 Revises: a7c3e9f1d482
