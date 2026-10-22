@@ -556,13 +556,17 @@ def analysis_section(
             error or f"{len(asked)} questions, {len(answered)} assistant messages",
         )
     finally:
-        if keep_on_failure and report.failures() > failures_before:
+        # Sin return aquí: dentro de finally se tragaría cualquier excepción del bloque de arriba
+        kept = keep_on_failure and report.failures() > failures_before
+        if kept:
             print(f"\nKept analysis {analysis_id} and its video for inspection; delete it with DeleteAnalysis when done")
-            return
-        _, error = timed("DeleteAnalysis", lambda: rpc.call(f"{service}/DeleteAnalysis", {"analysisId": analysis_id}, token))
-        report.check("DeleteAnalysis", error is None, error)
-        _, error = rpc.call(f"{service}/GetAnalysis", {"analysisId": analysis_id}, token)
-        report.check("Deleted analysis is NOT_FOUND", error and error["code"] == "not_found", error)
+        else:
+            _, error = timed("DeleteAnalysis", lambda: rpc.call(f"{service}/DeleteAnalysis", {"analysisId": analysis_id}, token))
+            report.check("DeleteAnalysis", error is None, error)
+            _, error = rpc.call(f"{service}/GetAnalysis", {"analysisId": analysis_id}, token)
+            report.check("Deleted analysis is NOT_FOUND", error and error["code"] == "not_found", error)
+    if kept:
+        return
     if video_url:
         check_object_gone(report, "Deleted analysis video", video_url)
     print("\nTimings")
