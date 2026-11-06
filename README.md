@@ -380,7 +380,7 @@ El script corre en seco por defecto. En seco solo lee la base, en una transacci�
 
 ## Flujo de trabajo
 
-- **Trabajo en ramas feature.** Aquí es `feature/grpc-backend`. Nunca hago commit directo en `main`; fusiono con `--no-ff` cuando el cambio está probado.
+- **Trabajo en una rama feature corta por cambio.** Nunca hago commit directo en `main`: creo la rama, la fusiono a `main` con `--no-ff` cuando el cambio está probado y la borro, local y en GitHub. En el repo solo queda `main`.
 - **El push a `main` despliega a producción.** Render reconstruye el backend desde `main` y Vercel hace lo mismo con el frontend. Las ramas feature del backend no se despliegan.
 - **La IA necesita un paso a mano.** Su push construye la imagen `ghcr.io/solartedaniers/kinesiapp-ai:<sha>`, pero Azure sigue en la revisión anterior hasta que corro `az containerapp update -n kinesiapp-ia -g kinesiapp-rg --image ghcr.io/solartedaniers/kinesiapp-ai:<sha>`.
 - **Las migraciones se corren a mano.** El contenedor no migra al arrancar. Antes de fusionar un cambio de esquema, corro `alembic upgrade head` desde local contra production, por el endpoint directo.
