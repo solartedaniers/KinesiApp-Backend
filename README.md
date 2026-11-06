@@ -4,17 +4,154 @@ Es el servidor de KinesiApp: un servidor gRPC asíncrono en Python (`grpcio` asy
 
 No hay API REST. Todo lo que entra y sale son RPC definidos en [KinesiApp-Contracts](https://github.com/solartedaniers/KinesiApp-Contracts).
 
-## Arquitectura
+## Arquitectura de KinesiApp
 
+KinesiApp son cuatro repos que se hablan solo por RPC definidos en [KinesiApp-Contracts](https://github.com/solartedaniers/KinesiApp-Contracts), sin API REST. Este diagrama y el de secuencia son los mismos en los cuatro README; cada flecha dice su protocolo.
+
+```mermaid
+flowchart LR
+  user(["Navegador"])
+
+  subgraph vercel["Vercel · fra1"]
+    next["Next.js<br/>Server Components y Server Actions<br/>runtime Node"]
+  end
+
+  subgraph render["Render · Frankfurt · un solo contenedor"]
+    envoyB["Envoy<br/>gRPC-Web → gRPC"]
+    api["Backend grpcio<br/>Python asyncio"]
+  end
+
+  subgraph azure["Azure Container Apps · canadacentral"]
+    ingress["Ingress HTTP/2 + TLS"]
+    envoyA["Envoy"]
+    ai["IA grpcio<br/>YOLO · MediaPipe · OpenCV"]
+  end
+
+  subgraph neon["Neon · Frankfurt"]
+    pg[("Postgres")]
+    s3[("Neon Storage<br/>buckets privados")]
+  end
+
+  gemini["Gemini API"]
+  resend["Resend"]
+
+  user -- "HTTPS: HTML, RSC y Server Actions" --> next
+  user -- "HTTPS PUT y GET con URL firmada" --> s3
+  next -- "gRPC-Web sobre HTTP/1.1 + TLS" --> envoyB
+  envoyB -- "gRPC nativo, HTTP/2 en localhost" --> api
+  api -- "protocolo Postgres + TLS, por el pooler" --> pg
+  api -- "API S3 por HTTPS: HEAD, GET parcial y DELETE" --> s3
+  api -- "gRPC nativo + TLS" --> ingress
+  ingress -- "HTTP/2" --> envoyA
+  envoyA -- "gRPC nativo en localhost" --> ai
+  ai -- "HTTPS GET con URL firmada" --> s3
+  ai -- "HTTPS, SDK google-genai" --> gemini
+  api -- "HTTPS, API de correo" --> resend
 ```
-Next.js (Vercel fra1) ──gRPC-Web, HTTP/1.1──▶ Envoy :$PORT ──gRPC nativo──▶ grpcio :50051
-                                                 (mismo contenedor, Render Frankfurt)
-                                                                    │
-                                    asyncpg ◀────────────┤────────────▶ IA: gRPC nativo + TLS
-                                 Neon Postgres (Frankfurt) │              (Azure Container Apps)
-                                                           ▼
-                                             Neon Storage (S3, buckets privados)
+
+### Flujo principal: subir un video, analizarlo, ver el resultado y preguntar al chat
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Deportista en el navegador
+  participant N as Next.js en Vercel
+  participant B as Backend en Render
+  participant S as Neon Storage
+  participant P as Neon Postgres
+  participant A as IA en Azure
+  participant G as Gemini
+
+  U->>N: Elige el movimiento y el video (máximo 40 s, lo valida un Web Worker)
+  N->>B: CreateVideoUpload
+  B-->>N: URL firmada de subida y upload_id
+  U->>S: PUT del video directo al bucket privado
+  N->>B: ConfirmVideoUpload
+  B->>S: HEAD y primeros bytes: tamaño, tipo y magic bytes
+  B->>P: Crea el análisis en PENDING
+  B-->>N: analysis_id
+  N->>B: WatchAnalysis (server streaming)
+  B->>A: WarmUp
+  B->>A: AnalyzeVideo con URL firmada de lectura (server streaming)
+  A->>S: GET del video
+  loop Por cada etapa: descarga, pose, repeticiones y riesgo
+    A-->>B: Progreso
+    B->>P: Guarda el progreso
+    B-->>N: Progreso
+    N-->>U: Anillo de progreso en vivo
+  end
+  A-->>B: Resultado: ángulos por cuadro y evaluación de riesgo
+  B->>P: Guarda las mediciones y el riesgo (PROCESSED)
+  B-->>N: Análisis terminado
+  N->>B: GetAnalysis y GetVideoPlaybackUrl
+  B-->>N: Resultado y URL firmada de corta vida
+  N-->>U: Resultados con Streaming SSR
+  U->>S: GET del video para verlo con el esqueleto
+  U->>N: Abre el chat
+  N->>B: StartConversation (server streaming)
+  B->>P: Lee el análisis
+  B->>A: ExplainAnalysis con los datos estructurados
+  A->>G: Prompt que arma la IA
+  G-->>A: Texto en streaming
+  A-->>B: Fragmentos
+  B-->>N: Fragmentos
+  N-->>U: La explicación se escribe en vivo
+  B->>P: Guarda la explicación
+  U->>N: Hace una pregunta
+  N->>B: SendMessage (server streaming)
+  B->>A: AnswerQuestion con los datos y el historial
+  A->>G: Prompt
+  G-->>A: Texto en streaming
+  A-->>B: Fragmentos
+  B-->>N: Fragmentos
+  N-->>U: Respuesta en vivo
+  B->>P: Guarda la pregunta y la respuesta
 ```
+
+### Qué hace cada parte
+
+- **Navegador.** Ahí la persona graba o elige el video. Valido la duración en un Web Worker y subo el archivo directo al bucket con una URL firmada, así el video nunca pasa por Vercel. El navegador no habla gRPC ni conoce la URL del backend.
+- **Next.js en Vercel.** Sirve las páginas con el patrón que le toca a cada una (SSG, ISR, SSR con streaming y CSR) y, desde los Server Components y las Server Actions, llama al backend con un cliente gRPC-Web generado del contrato. Guarda la sesión en cookies `httpOnly`.
+- **Envoy en Render.** Render solo acepta HTTP/1.1 desde internet, así que Envoy recibe gRPC-Web y lo traduce a gRPC nativo hacia grpcio, en el mismo contenedor. Solo deja pasar las rutas del contrato.
+- **Backend grpcio en Render.** Es el dueño de los datos y de las reglas: cuentas, roles, deportistas, equipos, análisis y chat. Verifica el token en un interceptor, guarda en Postgres, firma las URLs de los archivos y le encarga el trabajo pesado a la IA.
+- **IA en Azure Container Apps.** Es un microservicio gRPC propio. Analiza el video con YOLO, MediaPipe y OpenCV y devuelve en streaming el progreso, los ángulos y el riesgo. También arma el prompt del chat y habla con Gemini. Baja a cero réplicas cuando nadie la usa, por eso el backend la despierta con `WarmUp`.
+- **Neon Postgres.** Guarda las cuentas, los perfiles, los equipos, los análisis con sus mediciones y los mensajes del chat. Está en Frankfurt, junto al backend, para que cada consulta tarde poco.
+- **Neon Storage.** Son buckets privados compatibles con S3 para los videos, las fotos y los logos. Solo se entra con URLs firmadas de corta vida.
+- **Gemini.** Es el modelo de lenguaje que redacta la explicación del análisis y responde las preguntas. Solo lo llama la IA.
+- **Resend.** Envía desde `no-reply@kinesiapp.com` los correos con el código de verificación y el de recuperación de contraseña.
+
+## Arquitectura de este repo
+
+```mermaid
+flowchart TB
+  front["Next.js en Vercel"] -- "gRPC-Web sobre HTTP/1.1" --> envoy
+
+  subgraph container["Contenedor en Render"]
+    envoy["Envoy en $PORT<br/>responde /healthz y solo reenvía /kinesiapp.*"]
+    subgraph grpcio["grpcio asyncio en 127.0.0.1:50051"]
+      interceptors["Interceptores<br/>registro → errores → autenticación"]
+      servicers["Servicers de app/rpc<br/>validan la entrada con Pydantic"]
+      usecases["Casos de uso por dominio<br/>auth, account, admin, athletes, teams, analysis, chat"]
+      uow["Unit of Work + repositorios asíncronos"]
+      runner["AnalysisRunner + AnalysisProgressHub<br/>tareas de asyncio y Observer del progreso"]
+      adapters["Adaptadores<br/>IA, almacenamiento firmado y correo"]
+    end
+  end
+
+  envoy -- "gRPC nativo" --> interceptors
+  interceptors --> servicers
+  servicers --> usecases
+  usecases --> uow
+  usecases --> runner
+  usecases --> adapters
+  runner --> adapters
+  uow -- "asyncpg + TLS" --> pg[("Neon Postgres")]
+  adapters -- "API S3" --> s3[("Neon Storage")]
+  adapters -- "gRPC nativo + TLS" --> ai["IA en Azure"]
+  adapters -- "HTTPS" --> resend["Resend"]
+```
+
+`app/rpc/service_factory.py` es el único lugar que arma las piezas concretas; todo lo demás depende de abstracciones.
 
 - **Contract-first.** Traigo los contratos como submódulo en `contracts/`, fijado a un tag (hoy `v0.11.0`). `scripts/generate_grpc.py` genera el código Python en `generated/`, que no se versiona. Nunca implemento un RPC que no esté en el contrato.
 - **Envoy delante de grpcio.** Render solo acepta HTTP/1.1 desde internet, así que en el mismo contenedor Envoy recibe gRPC-Web en `$PORT`, lo traduce a gRPC nativo hacia `grpcio` en localhost y responde `/healthz`. Solo reenvía rutas `/kinesiapp.*` (`deploy/grpc/`).
