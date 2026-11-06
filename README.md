@@ -362,6 +362,22 @@ pytest                              # pytest.ini agrega generated/ al path
 | `UNAVAILABLE` con reason `AI_UNAVAILABLE` | La IA está dormida (escala a cero) o `AI_SERVICE_URL` está mal. | En frío tarda 20–33 s en despertar y el backend reintenta solo. Si sigue, reviso la URL y que la revisión de Azure esté sana. |
 | `UNAUTHENTICATED` desde la IA | El `AI_SERVICE_TOKEN` del backend no es el mismo que el de la IA. | Pongo el mismo valor en Render y en los secretos de Container Apps. |
 
+## Datos de demostración
+
+La base de producción tiene datos de demostración para la evaluación, **creados con un script** (`scripts/seed_demo.py`) y no a mano:
+
+- 2 entrenadores nuevos (Andrés Felipe Rojas y Lina Marcela Ospina), además de la cuenta demo de Omaira;
+- 4 deportistas con cuenta propia y 9 deportistas gestionados;
+- 4 equipos y 20 análisis, con fechas repartidas entre septiembre y noviembre de 2026.
+
+Las cuentas nuevas usan alias `+demo` del correo del proyecto. Los análisis de demostración no tienen chat: la explicación se pide con el botón "Explicar resultados".
+
+- **Los análisis son de verdad.** Cada uno salió de un recorte de mis propios videos (cortado con `imageio-ffmpeg`), subido por el flujo normal y analizado por la IA en Azure. Ningún número está inventado.
+- **En todos los videos aparece la misma persona.** Los recortes salen de cinco videos míos y se asignaron a deportistas distintos, así que el nombre de la ficha no corresponde a la persona del video.
+- **El riesgo casi siempre sale bajo.** En esos videos el movimiento es correcto: casi todos los análisis dan riesgo 0 %, y solo los saltos de vista lateral marcan un aterrizaje rígido leve.
+
+El script corre en seco por defecto. En seco solo lee la base, en una transacción de solo lectura, y muestra qué crearía. Con `--apply` lo crea; con `--cleanup` muestra qué borraría, y con `--cleanup --apply` lo borra: los análisis por `DeleteAnalysis`, para que también salgan sus videos del bucket, y después equipos, gestionados y cuentas de demo. Las contraseñas las pide con `getpass`. El plan (personas, recortes y fechas) vive fuera del repo.
+
 ## Flujo de trabajo
 
 - **Trabajo en ramas feature.** Aquí es `feature/grpc-backend`. Nunca hago commit directo en `main`; fusiono con `--no-ff` cuando el cambio está probado.
